@@ -125,8 +125,6 @@ YouTube's terms do not allow automated downloading, subtitles included, without 
 
 ![Con y sin IA](docs/comparison-es.svg)
 
-Si venías de la versión anterior (*Referentes*), tu carpeta de datos se migra sola y se queda en español.
-
 ## License
 
 Code under the MIT license: use it, change it, sell it, just keep the copyright notice. The name "Ask Your Mentors", the logo and Washtol are not part of that license. Third-party pieces: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
