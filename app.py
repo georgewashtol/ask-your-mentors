@@ -18,7 +18,7 @@ import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 import advisor
 import ai
@@ -141,7 +141,7 @@ def mentors_with_status() -> list:
         m["status"] = search.mentor_status(store.corpus() / m["slug"])
         m["status"].pop("missing", None)
         j = jobs.get(m["slug"])
-        m["job"] = {k: j.get(k) for k in ("id", "kind", "status", "progress", "summary", "finished", "percent")} if j else None
+        m["job"] = {k: j.get(k) for k in ("id", "kind", "status", "progress", "summary", "finished", "percent", "eta")} if j else None
         out.append(m)
     return out
 
@@ -228,6 +228,34 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.security_headers()
         self.send_header("Content-Type", ctype or mimetypes.guess_type(str(path))[0] or "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def send_document(self, slug: str, sid: str, download: bool):
+        """A PDF or text uploaded as a mentor's source: inline to preview it, or as a download.
+        Only PDFs are shown as such; a TXT, MD or HTML goes as plain text so an uploaded page never runs here."""
+        m = store.mentor(slug)
+        src = next((s for s in (m or {}).get("sources", []) if s.get("type") == "file" and s.get("id") == sid), None)
+        if not src or not re.fullmatch(r"[\w-]{1,40}", sid):
+            return self.send_error(404)
+        folder = store.raw_dir(store.corpus() / slug)
+        path = folder / f"{sid}-{src['name']}"
+        if not path.is_file():
+            path = next(iter(sorted(folder.glob(f"{sid}-*"))), None)
+        if not path or not path.is_file():
+            return self.send_error(404)
+        pdf = path.suffix.lower() == ".pdf"
+        body = path.read_bytes()
+        self.send_response(200)
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        # no script-src or object-src here: the browser's own PDF viewer has to run; it is still only framed by the app
+        self.send_header("Content-Security-Policy", store.hook("csp", "frame-ancestors 'self'", default="frame-ancestors 'self'"))
+        self.send_header("Content-Type", "application/pdf" if pdf else "text/plain; charset=utf-8")
+        self.send_header("Content-Disposition", ("attachment" if download else "inline") +
+                         "; filename*=UTF-8''" + quote(src["name"]))
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -340,6 +368,8 @@ class Handler(BaseHTTPRequestHandler):
             if not store.mentor(slug):
                 raise ValueError(tr("That mentor does not exist.", "Ese referente no existe."))
             return self.send_json({"items": search.material(store.corpus() / slug)})
+        if path == "/api/mentors/document":
+            return self.send_document(q.get("slug", ""), q.get("id", ""), download=q.get("download") == "1")
         if path == "/api/export":
             name = "ask-your-mentors-" + store.now()[:10] + ".json"
             return self.send_json(export(), extra={"Content-Disposition": f'attachment; filename="{name}"'})

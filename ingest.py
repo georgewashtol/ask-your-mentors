@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import threading
 import time
+import unicodedata
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -254,13 +255,20 @@ class Log:
     def __init__(self, jid: int):
         self.jid, self.lines, self._t = jid, [], 0.0
         self.source, self.sources = 1, 1          # for the overall percent when there are several sources
+        self._pace = None                         # (source, first step, its time) to estimate the time left
 
     def progress(self, text: str, step: tuple | None = None) -> None:
-        """Saves the progress; with step=(3, 30) it also works out the percent of the whole job."""
-        fields = {"progress": text[:300]}
+        """Saves the progress; with step=(3, 30) it also works out the percent of the whole job and the time left
+        for this source (from the pace of the steps done in this run: what was already here does not count)."""
+        fields = {"progress": text[:300], "eta": 0}
         if step and step[1]:
             part = min(1.0, (step[0] - 1) / step[1])
             fields["percent"] = round(100 * ((self.source - 1) + part) / max(self.sources, 1), 1)
+            if not self._pace or self._pace[0] != self.source or step[0] < self._pace[1]:
+                self._pace = (self.source, step[0], time.time())
+            done, spent = step[0] - self._pace[1], time.time() - self._pace[2]
+            if done >= 2 and spent > 30:
+                fields["eta"] = int(spent / done * (step[1] - step[0] + 1))
         _set(self.jid, **fields)
         self.log(text)
 
@@ -577,7 +585,10 @@ def _rss(d: Path, url: str, language: str, limit: int, log: Log) -> str:
     index = search.read_index(d)
     raw_folder = store.raw_dir(d)
     already = {mm.group(1) for p in raw_folder.glob("*.*") for mm in [clean.RE_ID.search(p.name)] if mm}
-    done = without_whisper = 0
+    # Many creators publish the same episode on YouTube and as a podcast: if the video is already here, whisper is skipped
+    on_youtube = {_title_key(row[4]) for k, row in index.items() if k in already and not k.startswith(("rss-", "doc-", "web-"))}
+    on_youtube.discard("")
+    done = without_whisper = same_as_video = 0
     for n, it in enumerate(items, 1):
         guid = (it.findtext("guid") or "").strip()
         enc = it.find("enclosure")
@@ -594,9 +605,14 @@ def _rss(d: Path, url: str, language: str, limit: int, log: Log) -> str:
             date = ""
         dur = search.duration_to_seconds(it.findtext(NS_ITUNES + "duration") or "")
         public_url = link if link.startswith("http") else audio
-        index[sid] = [sid, date, str(int(dur)) if dur else "", "", title, public_url]
         if sid in already:
+            index[sid] = [sid, date, str(int(dur)) if dur else "", "", title, public_url]
             continue
+        if _title_key(title) in on_youtube:
+            same_as_video += 1
+            index.pop(sid, None)
+            continue
+        index[sid] = [sid, date, str(int(dur)) if dur else "", "", title, public_url]
         log.progress(tr("Podcast: episode {a} of {b}: {t}", "Podcast: episodio {a} de {b}: {t}", a=n, b=len(items), t=title[:70]),
                      (n, len(items)))
         base = f"{date} - {_safe_name(title)} [{sid}]"
@@ -636,11 +652,23 @@ def _rss(d: Path, url: str, language: str, limit: int, log: Log) -> str:
                   "Podcast: estás al día, no hay nada nuevo ({a} episodios revisados).", a=len(items))
     else:
         note = ""
+    if same_as_video:
+        note += tr(" {n} episodes skipped because they are the same as a YouTube video you already have.",
+                   " {n} episodios omitidos porque son el mismo video que ya tienes de YouTube.", n=same_as_video)
     if without_whisper:
         note += tr("{n} episodes stay without text because whisper-cli with a model is not installed (see the README: whisper is optional).",
                    "{n} episodios quedan sin texto porque no hay whisper-cli con modelo instalado (ver el README: whisper es opcional).",
                    n=without_whisper)
     return note
+
+
+def _title_key(title: str) -> str:
+    """The same episode title on YouTube and on the podcast: no accents, case, symbols or "7x13." season prefix.
+    Short titles ("Q&A", "Episode 3") never match: they are too generic to be sure."""
+    t = unicodedata.normalize("NFKD", str(title or "").lower())
+    t = re.sub(r"^\s*(\d+x\d+|ep\.?\s*\d+|#\d+)[.:)\s-]*", "", t)
+    t = re.sub(r"[^a-z0-9]", "", t)
+    return t if len(t) >= 20 else ""
 
 
 def _transcribe(audio: Path, target_vtt: Path, language: str, log: Log) -> bool:

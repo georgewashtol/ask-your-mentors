@@ -825,6 +825,13 @@ $('#dlg-add').addEventListener('close', () => STOP_FINDER());     // closing the
 let JOBS = [], JOBS_POLL = null;
 // The pieces of a mentor row that change while a job runs: built apart so a refresh can patch them in place
 function jobOf(r) { const t = r.job; return { t, active: !!t && (t.status === 'queued' || t.status === 'running') }; }
+// The server estimates it from the pace of this run; "" while there is not enough to measure yet
+function timeLeft(s) {
+  s = Math.round(+s || 0); if (!s) return '';
+  const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60);
+  const t = s < 60 ? L('under 1 min', 'menos de 1 min') : h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`;
+  return L(`~${t} left`, `faltan ~${t}`);
+}
 function progressParts(r) {
   const e = r.status, { t, active } = jobOf(r);
   const fresh = t && t.status === 'done' && t.kind === 'download' && minutesSince(t.finished) < 30;     // just finished: say what came in
@@ -832,7 +839,7 @@ function progressParts(r) {
   const what = t.kind === 'profile' ? L('✍️ The AI writes their profile', '✍️ La IA escribe su perfil') : L('⟳ Updating', '⟳ Actualizando');
   return {
     id: t.id, cls: t.status === 'error' ? 'error' : (t.status === 'done' ? 'finished' : ''),
-    bar: active && t.kind === 'download', pct: Math.max(0, Math.min(100, +t.percent || 0)),
+    bar: active && t.kind === 'download', pct: Math.max(0, Math.min(100, +t.percent || 0)), eta: active ? timeLeft(t.eta) : '',
     body: active ? `${what}: ${esc(t.progress)}` : fresh ? `✓ ${esc(String(t.summary || '').trim())}` : shortError(t),
     log: (JOBS.find(x => x.id === t.id)?.log || '').split('\n').slice(-40).join('\n'),
   };
@@ -840,7 +847,7 @@ function progressParts(r) {
 function progressHTML(r) {
   const g = progressParts(r);
   if (!g) return '';
-  return `<div class="progress ${g.cls}" data-job="${g.id}">${g.bar ? `<div class="bar-row"><b>${Math.round(g.pct)}%</b><div class="bar" role="progressbar" aria-valuenow="${Math.round(g.pct)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${g.pct}%"></span></div></div>` : ''}<div class="prog-text">${g.body}</div>
+  return `<div class="progress ${g.cls}" data-job="${g.id}">${g.bar ? `<div class="bar-row"><b>${Math.round(g.pct)}%</b><div class="bar" role="progressbar" aria-valuenow="${Math.round(g.pct)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${g.pct}%"></span></div><small class="eta">${g.eta}</small></div>` : ''}<div class="prog-text">${g.body}</div>
     ${g.log ? `<details class="job-log"><summary>${L('See details', 'Ver detalle')}</summary><pre>${esc(g.log)}</pre></details>` : ''}</div>`;
 }
 function statsText(r) {
@@ -868,6 +875,7 @@ function paintMentors() {
       const u = SafeMarkdown.safeUrl(f.page || f.url);
       const inner = `${sourceIcon(f)}<span>${esc(f.name || f.url)}</span>`;
       return u ? `<a class="source-chip" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(platformName(platform(f)))}">${inner}</a>`
+        : f.type === 'file' && f.id ? `<button type="button" class="source-chip doc" data-act="doc" data-id="${esc(f.id)}" title="${L('See the document', 'Ver el documento')}">${inner}</button>`
         : `<span class="source-chip" title="${L('Uploaded document', 'Documento subido')}">${inner}</span>`;
     }).join('');
     const profile = (r.profile || '').trim();
@@ -915,6 +923,7 @@ function updateMentors() {
       cur.querySelector('.bar-row b').textContent = `${Math.round(g.pct)}%`;
       cur.querySelector('.bar span').style.width = `${g.pct}%`;
       cur.querySelector('.bar').setAttribute('aria-valuenow', String(Math.round(g.pct)));
+      cur.querySelector('.bar-row .eta').textContent = g.eta;
     }
     const text = cur.querySelector('.prog-text');
     if (text.innerHTML !== g.body) text.innerHTML = g.body;
@@ -985,6 +994,18 @@ function sendDocument(slug, file, profile = true) {
     reader.readAsDataURL(file);
   });
 }
+// A PDF uploaded as a source: preview first, with a button to download it
+function openDocument(r, id) {
+  const f = r.sources.find(x => x.type === 'file' && x.id === id); if (!f) return;
+  const url = `/api/mentors/document?slug=${encodeURIComponent(r.slug)}&id=${encodeURIComponent(id)}`;
+  $('#doc-title').textContent = f.name;
+  $('#doc-download').href = url + '&download=1';
+  $('#doc-download').setAttribute('download', f.name);
+  $('#doc-frame').src = url;
+  $('#dlg-doc').showModal();
+}
+$('#close-doc').addEventListener('click', () => $('#dlg-doc').close());
+$('#dlg-doc').addEventListener('close', () => { $('#doc-frame').src = 'about:blank'; });
 function uploadDocument(slug) {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = '.pdf,.txt,.md,.html,.htm';
@@ -1009,6 +1030,7 @@ async function mentorAction(act, slug, id) {
       await api('/api/mentors/source', { slug, url: url.trim() }); await loadMentors(); return refreshJobs(true);
     }
     if (act === 'upload') return uploadDocument(slug);
+    if (act === 'doc') return openDocument(r, id);
     if (act === 'all') { await api('/api/mentors/download', { slug, limit: 0 }); return refreshJobs(true); }
     if (act === 'cancel') { await api('/api/jobs/cancel', { id: +id }); return refreshJobs(true); }
     if (act === 'delete') {

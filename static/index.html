@@ -96,6 +96,15 @@
   </div>
 </dialog>
 
+<!-- ============ Dialog: preview of an uploaded document ============ -->
+<dialog id="dlg-doc" class="dialog wide doc-dialog">
+  <div class="dlg-body">
+    <div class="dlg-head"><h2 id="doc-title">Document</h2>
+      <span class="dlg-actions"><a id="doc-download" class="icon-btn" href="#" title="Download" data-es-title="Descargar" aria-label="Download" data-es-aria="Descargar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a><button type="button" id="close-doc" class="icon-btn" aria-label="Close" data-es-aria="Cerrar">✕</button></span></div>
+    <iframe id="doc-frame" class="doc-frame" title="Document" src="about:blank"></iframe>
+  </div>
+</dialog>
+
 <!-- ============ Dialog: a mentor's material ============ -->
 <dialog id="dlg-material" class="dialog wide">
   <div class="dlg-body">

@@ -311,6 +311,15 @@ button.icon-btn.panel:hover { color: var(--gold); border-color: var(--gold); bac
 
 /* a mentor's material */
 .dialog.wide { width: min(760px, 94vw); }
+.doc-dialog { width: min(980px, 96vw); }
+.doc-dialog h2 { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dlg-actions { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.dlg-actions a.icon-btn { display: inline-flex; align-items: center; color: var(--muted); text-decoration: none; }
+.dlg-actions a.icon-btn:hover { color: var(--text); }
+.doc-frame { width: 100%; height: 78vh; border: 1px solid var(--border2); border-radius: 10px; background: #fff; margin-top: 12px; }
+.sources-box button.source-chip { font: inherit; color: inherit; background: transparent; cursor: pointer; }
+.sources-box button.source-chip:hover { border-color: var(--gold); color: var(--text); }
+.bar-row .eta { flex: 0 0 auto; color: var(--muted); white-space: nowrap; }
 .see-material { align-self: flex-start; font-size: 12.5px; color: var(--gold); padding: 2px 0; border: 0; }
 .see-material:hover { background: transparent; text-decoration: underline; }
 .mat-list { display: flex; flex-direction: column; gap: 4px; }

@@ -119,6 +119,14 @@ def mode_instruction(mode: str, user: str, rag: bool = False) -> str:
     return " ".join(parts)
 
 
+def roster() -> str:
+    """The mentors that exist in the app right now. A protocol written by hand, or the folder of a deleted mentor,
+    can still name others: those are not mentors and are never mentioned."""
+    names = ", ".join(f"{m['name']} ({m['slug']})" for m in store.list_mentors())
+    return (f"The user's mentors are ONLY: {names}. Any other name or folder you see in the corpus or in CLAUDE.md "
+            f"is not one of their mentors: never cite it or mention it. ")
+
+
 def _base_instruction(mode: str, user: str, rag: bool = False) -> str:
     """rag=True: the model has no tools or files, only the fragments in the prompt."""
     source = "with this structure" if rag else "following the protocol in this folder's CLAUDE.md / AGENTS.md"
@@ -139,11 +147,11 @@ def _base_instruction(mode: str, user: str, rag: bool = False) -> str:
                f"**{h_next}:** one concrete action. Mark as extrapolation whatever they did not say verbatim. ")
     if mode == "auto":
         return ("ADVICE MODE (the AI picks). Decide which 2 or 3 mentors have something REAL to say about this. "
-                f"Why you chose them goes in the {h_summary}, not at the start. " + several + rules)
+                f"Why you chose them goes in the {h_summary}, not at the start. " + roster() + several + rules)
     if mode == "all":
         return ("EVERYONE MODE. Ask every mentor who has material on the topic. Never say a mentor has nothing on it "
                 "unless you searched them (-m <slug>); if a search fails, say which mentors you could not check. "
-                + several + rules)
+                + roster() + several + rules)
     g = find_group(mode)
     if g:
         names = ", ".join((store.mentor(x) or {"name": x})["name"] for x in g["slugs"])

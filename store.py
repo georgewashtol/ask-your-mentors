@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_chat ON messages(chat_id);
 CREATE TABLE IF NOT EXISTS jobs(
   id INTEGER PRIMARY KEY, slug TEXT NOT NULL, kind TEXT NOT NULL, params TEXT DEFAULT '{}',
   status TEXT NOT NULL, progress TEXT DEFAULT '', log TEXT DEFAULT '', summary TEXT DEFAULT '',
-  created TEXT NOT NULL, started TEXT DEFAULT '', finished TEXT DEFAULT '', percent REAL DEFAULT 0);
+  created TEXT NOT NULL, started TEXT DEFAULT '', finished TEXT DEFAULT '', percent REAL DEFAULT 0, eta INTEGER DEFAULT 0);
 """
 
 RE_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,58}[a-z0-9]$|^[a-z0-9]$")
@@ -78,6 +78,8 @@ def start(data_folder: str | None = None) -> None:
     conn = db()
     _migrate_database(conn)
     conn.executescript(SCHEMA)
+    if "eta" not in {r[1] for r in conn.execute("PRAGMA table_info(jobs)")}:      # databases from before the time left
+        conn.execute("ALTER TABLE jobs ADD COLUMN eta INTEGER DEFAULT 0")
     # If the server restarted with an answer or a job halfway, its thread died: mark it.
     conn.execute("UPDATE messages SET status='error', text=? WHERE status='pending'",
                  (tr("The server restarted before this answer was ready. Ask again.",

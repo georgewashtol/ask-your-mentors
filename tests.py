@@ -191,6 +191,18 @@ class Server(unittest.TestCase):
         self.post("/api/mentors/file", {"slug": "viktor-frankl", "name": "two.txt", "data": doc("Freedom to choose. " * 40)})
         m = next(x for x in self.get("/api/mentors")["mentors"] if x["slug"] == "viktor-frankl")
         self.assertEqual([s["name"] for s in m["sources"]], ["one.txt", "two.txt"])
+        # the uploaded file can be previewed (inline) and downloaded; a text never goes as HTML
+        sid = m["sources"][0]["id"]
+        st, h, body = self.request(f"/api/mentors/document?slug=viktor-frankl&id={sid}")
+        self.assertEqual((st, h["Content-Type"], h["Content-Disposition"].split(";")[0]), (200, "text/plain; charset=utf-8", "inline"))
+        self.assertIn(b"Meaning first.", body)
+        st, h, _ = self.request(f"/api/mentors/document?slug=viktor-frankl&id={sid}&download=1")
+        self.assertTrue(h["Content-Disposition"].startswith("attachment"))
+        with self.assertRaises(urllib.error.HTTPError):
+            self.request("/api/mentors/document?slug=viktor-frankl&id=doc-nope")
+        import advisor
+        with patch.object(advisor.store, "list_mentors", return_value=[{"name": "Viktor Frankl", "slug": "viktor-frankl"}]):
+            self.assertIn("ONLY: Viktor Frankl (viktor-frankl)", advisor.roster())
         self.assertEqual(self.post("/api/mentors/manual", {"name": "Viktor Frankl"})["mentor"]["slug"], "viktor-frankl-2")
         with self.assertRaises(urllib.error.HTTPError):
             self.post("/api/mentors/manual", {"name": " "})
@@ -462,6 +474,15 @@ class Resume(unittest.TestCase):
 
 
 class Units(unittest.TestCase):
+    def test_same_episode_on_youtube_and_podcast(self):
+        import ingest
+        k = ingest._title_key
+        self.assertEqual(k("7x13. Cómo Usar la AUTOSUGESTION para Influir en tu SUBCONSCIENTE"),
+                         k("Cómo usar la autosugestión para influir en tu subconsciente"))
+        self.assertEqual(k("Q&A"), "")                      # too short to be sure it is the same one
+        self.assertNotEqual(k("La razón por la que gané 51,000$ en un día"), k("La razón por la que perdí 51,000$ en un día"))
+
+
     def test_clean_rolling_vtt(self):
         with tempfile.TemporaryDirectory() as d:
             m = Path(d) / "x"
