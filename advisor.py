@@ -68,7 +68,11 @@ def agent_commands() -> list:
     """Commands the agent may run: the search and the ones in the settings ("extra_commands")."""
     s = store.BASE / "search.py"
     extra = [str(c) for c in (store.config().get("extra_commands") or []) if str(c).strip()]
-    return [f"{store.PYTHON} {s}", f"{store.PYTHON} \"{s}\""] + extra
+    cmds = [f"{store.PYTHON} {s}", f"{store.PYTHON} \"{s}\""] + extra
+    # The agent often writes the home folder as ~ (as a hand-written CLAUDE.md does): allow that spelling too,
+    # or every such search is silently refused and the answer leaves mentors out.
+    home = str(Path.home())
+    return list(dict.fromkeys(cmds + [c.replace(home, "~") for c in cmds if home in c]))
 
 
 def agent_folders() -> list:
@@ -118,7 +122,10 @@ def mode_instruction(mode: str, user: str, rag: bool = False) -> str:
 def _base_instruction(mode: str, user: str, rag: bool = False) -> str:
     """rag=True: the model has no tools or files, only the fragments in the prompt."""
     source = "with this structure" if rag else "following the protocol in this folder's CLAUDE.md / AGENTS.md"
-    look = "" if rag else "Search with the search tool before stating anything; "
+    look = "" if rag else (f"Search with the search tool before stating anything. Run it as {agent_commands()[0]} \"...\" "
+                           f"(or another allowed command exactly as written), ONE command per call: no cd, no pipes, "
+                           f"no ; or && and no 2>/dev/null, or the command is refused. Your reply is only the answer: no status lines "
+                           f"like 'checking one more thing' before it. ")
     rules = (f"{look}Always cite the minute and the URL as [Title, mm:ss](url). No em dashes. Markdown. "
              f"Be concise and practical: about 80 to 150 words per mentor and the whole answer under about 450 words, "
              f"unless the question asks for depth. Quality over length: their sharpest ideas, not everything they said.")
@@ -134,7 +141,9 @@ def _base_instruction(mode: str, user: str, rag: bool = False) -> str:
         return ("ADVICE MODE (the AI picks). Decide which 2 or 3 mentors have something REAL to say about this. "
                 f"Why you chose them goes in the {h_summary}, not at the start. " + several + rules)
     if mode == "all":
-        return "EVERYONE MODE. Ask every mentor who has material on the topic. " + several + rules
+        return ("EVERYONE MODE. Ask every mentor who has material on the topic. Never say a mentor has nothing on it "
+                "unless you searched them (-m <slug>); if a search fails, say which mentors you could not check. "
+                + several + rules)
     g = find_group(mode)
     if g:
         names = ", ".join((store.mentor(x) or {"name": x})["name"] for x in g["slugs"])
@@ -247,7 +256,14 @@ def head_start(question: str, mode: str) -> str:
     import os
     if store.config().get("head_start") is False or os.environ.get("MENTORS_NO_HEAD_START"):
         return ""
-    frags = _fragments(question, mode_slugs(mode), max_fragments=12, per_source=2, size=700)
+    slugs = mode_slugs(mode)
+    if mode == "all" or (slugs and len(slugs) > 1):
+        # Everyone or a group: the best 2 of EACH mentor, so one mentor with many loose word matches cannot
+        # crowd the others out and the agent knows from the start who has material on the question.
+        scope = slugs or [m["slug"] for m in store.list_mentors()]
+        frags = [f for slug in scope for f in _fragments(question, [slug], max_fragments=2, per_source=1, size=500)]
+    else:
+        frags = _fragments(question, slugs, max_fragments=12, per_source=2, size=700)
     if not frags:
         return ""
     lines = "\n\n".join(f"[{i}] {f['name']} | {f['title']} | {f['minute'] or '-'} | {f['url'] or '-'}\n{f['text']}"
