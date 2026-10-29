@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import socket
 import sqlite3
 import subprocess
@@ -216,14 +217,16 @@ class Server(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError):
             self.request("/api/mentors/document?slug=viktor-frankl&id=doc-nope")
         # a long PDF name keeps its .pdf, and a PDF is served as a PDF even if an older version cut its name
-        long = "A" * 200 + ".pdf"
-        pdf = "data:application/pdf;base64," + base64.b64encode(tiny_pdf("Meaning is found in responsibility.")).decode()
-        self.post("/api/mentors/file", {"slug": "viktor-frankl", "name": long, "data": pdf, "profile": False})
-        m = next(x for x in self.get("/api/mentors")["mentors"] if x["slug"] == "viktor-frankl")
-        f = m["sources"][-1]
-        self.assertTrue(f["name"].endswith(".pdf") and len(f["name"]) == 120, f["name"])
-        st, h, _ = self.request(f"/api/mentors/document?slug=viktor-frankl&id={f['id']}")
-        self.assertEqual(h["Content-Type"], "application/pdf")
+        # (reading a PDF on Linux or Windows needs pdftotext from poppler; CI installs it)
+        if sys.platform == "darwin" or shutil.which("pdftotext"):
+            long = "A" * 200 + ".pdf"
+            pdf = "data:application/pdf;base64," + base64.b64encode(tiny_pdf("Meaning is found in responsibility.")).decode()
+            self.post("/api/mentors/file", {"slug": "viktor-frankl", "name": long, "data": pdf, "profile": False})
+            m = next(x for x in self.get("/api/mentors")["mentors"] if x["slug"] == "viktor-frankl")
+            f = m["sources"][-1]
+            self.assertTrue(f["name"].endswith(".pdf") and len(f["name"]) == 120, f["name"])
+            st, h, _ = self.request(f"/api/mentors/document?slug=viktor-frankl&id={f['id']}")
+            self.assertEqual(h["Content-Type"], "application/pdf")
         import advisor
         with patch.object(advisor.store, "list_mentors", return_value=[{"name": "Viktor Frankl", "slug": "viktor-frankl"}]):
             self.assertIn("ONLY: Viktor Frankl (viktor-frankl)", advisor.roster())
