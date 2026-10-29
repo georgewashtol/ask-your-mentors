@@ -599,7 +599,8 @@ $('#stop').addEventListener('click', async () => {
   try { await api('/api/chat/stop', { message_id: PENDING }); } catch (e) { alert(e.message); }
   $('#stop').disabled = false;
 });
-function newChat() { CHAT = 0; PENDING = 0; clearInterval(POLL); composerState(); paintChips(); paintMessages([]); loadChats(); }
+// A new conversation always starts from the default (the AI picks), not from the mentors of the chat that was open
+function newChat(mode) { CHAT = 0; PENDING = 0; MODE = mode || STATUS.initial_mode || 'auto'; PICKED = new Set(); clearInterval(POLL); composerState(); paintChips(); paintMessages([]); loadChats(); }
 function fitComposer() { const t = $('#question'); t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; }
 $('#question').addEventListener('input', fitComposer);
 $('#question-form').addEventListener('submit', ev => { ev.preventDefault(); ask(); });
@@ -927,7 +928,7 @@ function uploadDocument(slug) {
 async function mentorAction(act, slug, id) {
   const r = MENTORS.find(x => x.slug === slug);
   try {
-    if (act === 'ask') { MODE = slug; showView('chat'); newChat(); $('#question').focus(); return; }
+    if (act === 'ask') { showView('chat'); newChat(slug); $('#question').focus(); return; }
     if (act === 'profile') { if (!STATUS.ai_ready) return openConnect(); await api('/api/mentors/profile', { slug }); return refreshJobs(true); }
     if (act === 'material') return openMaterial(r);
     if (act === 'find') return openAdd(r);
