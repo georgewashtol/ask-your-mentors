@@ -295,11 +295,11 @@ button.icon-btn.panel:hover { color: var(--gold); border-color: var(--gold); bac
 .selector-btn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; }
 .selector-btn .caret { font-size: 10px; opacity: .8; }
 .selector-btn .mini-avatar, .selector-btn img.avatar { width: 20px; height: 20px; border-radius: 50%; font-size: 9px; }
-.selector { position: fixed; z-index: 70; width: min(720px, calc(100vw - 16px)); max-height: min(70vh, 600px); display: flex; flex-direction: column;
+.selector { position: fixed; z-index: 70; width: min(560px, calc(100vw - 16px)); max-height: min(70vh, 600px); display: flex; flex-direction: column;
   background: var(--panel); border: 1px solid var(--border2); border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,.55); padding: 10px; gap: 8px; }
 .selector input { padding: 9px 12px; }
-/* as many columns as fit at ~260px: two on a laptop, one on a phone */
-.sel-list { overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 6px; }
+/* as many columns as fit at ~250px: two on a laptop, one on a phone */
+.sel-list { overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr)); gap: 6px; }
 .sel-item { display: flex; align-items: center; gap: 8px; text-align: left; padding: 7px; border-radius: 10px; background: var(--panel2);
   border: 1px solid var(--border); min-width: 0; }
 .sel-item:hover, .sel-item:focus { border-color: var(--gold); outline: none; }

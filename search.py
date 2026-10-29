@@ -348,8 +348,22 @@ def _mentor_status(mentor_dir: Path) -> dict:
     for sid in everything:
         secs += duration_to_seconds(index[sid][2]) if sid in index else duration_to_seconds(with_text[sid].get("duration", ""))
     missing = [v for v in index if v not in with_text]
+    kinds = {"video": 0, "audio": 0, "doc": 0}
+    for sid, head in with_text.items():
+        kinds[source_kind(sid, head)] += 1
     return {"indexed": len(everything), "with_text": len(with_text), "without_text": len(missing),
-            "hours": round(secs / 3600, 1), "missing": missing}
+            "hours": round(secs / 3600, 1), "missing": missing, "kinds": kinds}
+
+
+def source_kind(sid: str, head: dict) -> str:
+    """What a transcript came from, so the UI can say "459 videos · 54 audios" instead of "513 with text"."""
+    if sid.startswith("rss-"):
+        return "audio"
+    if sid.startswith(("doc-", "web-")):
+        return "doc"
+    if re.fullmatch(r"[A-Za-z0-9_-]{11}", sid) or head.get("duration"):
+        return "video"                                   # YouTube, or a recorded class with a length
+    return "doc"
 
 
 # ---------------------------------------------------------------- CLI

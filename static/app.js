@@ -327,7 +327,7 @@ function paintSelector() {
   const q = $('#sel-filter').value.trim().toLowerCase();
   const list = MENTORS.filter(r => !q || r.name.toLowerCase().includes(q));
   $('#sel-list').innerHTML = list.map(r => `<button type="button" class="sel-item ${PICKED.has(r.slug) ? 'active' : ''}" data-slug="${esc(r.slug)}" aria-pressed="${PICKED.has(r.slug)}">
-      <span class="check-mark">${PICKED.has(r.slug) ? '✓' : ''}</span>${avatar(r)}<span class="sel-text"><b>${esc(r.name)}</b><small>${r.status.with_text} ${L('with text', 'con texto')} · ${esc(hoursText(r.status.hours))}</small></span></button>`).join('')
+      <span class="check-mark">${PICKED.has(r.slug) ? '✓' : ''}</span>${avatar(r)}<span class="sel-text"><b>${esc(r.name)}</b><small>${esc(materialShort(r.status))}</small></span></button>`).join('')
     || `<p class="muted small" style="padding:8px">${L('No one with that name.', 'Nadie con ese nombre.')}</p>`;
   $$('#sel-list .sel-item').forEach(b => b.addEventListener('click', () => {
     PICKED.has(b.dataset.slug) ? PICKED.delete(b.dataset.slug) : PICKED.add(b.dataset.slug);
@@ -356,6 +356,17 @@ window.addEventListener('resize', () => toggleSelector(false));
 
 // Duration in words: "1 hour 36 minutes", "54 hours", "25 minutes"
 const plural = (n, en, es) => `${n.toLocaleString(LOCALE())} ${L(en, es)}${n === 1 ? '' : 's'}`;
+// Short line for the picker: what the AI can read, by kind, and how long it is: "459 videos · 54 audios · 188 h"
+function materialShort(st) {
+  const k = st.kinds || {}, loc = LOCALE();
+  const n = (x, en1, en, es1, es) => x ? `${x.toLocaleString(loc)} ${x === 1 ? L(en1, es1) : L(en, es)}` : '';
+  const parts = st.kinds ? [n(k.video, 'video', 'videos', 'video', 'videos'), n(k.audio, 'audio', 'audios', 'audio', 'audios'),
+    n(k.doc, 'document', 'documents', 'documento', 'documentos')] : [n(st.with_text, 'source', 'sources', 'fuente', 'fuentes')];
+  const min = Math.round((+st.hours || 0) * 60), h = Math.floor(min / 60);
+  const time = !min ? '' : h >= 10 || (h && !(min % 60)) ? `${h} h` : h ? `${h} h ${min % 60} min` : `${min} min`;
+  const out = [...parts, time].filter(Boolean).join(' · ');
+  return out || L('No material yet', 'Sin material todavía');
+}
 function hoursText(h) {
   const min = Math.round((+h || 0) * 60);
   if (!min) return L('less than a minute', 'menos de un minuto');
