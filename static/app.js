@@ -305,14 +305,21 @@ const sourceIcon = f => `<svg class="platform" viewBox="0 0 24 24" aria-hidden="
 const initials = n => n.trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
 
 // ---------------------------------------------------------------- mentor picker (dropdown with search)
+// Under its button, as wide as the screen allows, never past the edges (the width itself is in the CSS)
+function placeSelector() {
+  const sel = $('#selector'), b = $('#open-selector');
+  if (sel.hidden || !b) return;
+  const r = b.getBoundingClientRect();
+  sel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - sel.offsetWidth - 8)) + 'px';
+  sel.style.top = (r.bottom + 6) + 'px';
+  sel.style.maxHeight = `min(70vh, 600px, ${Math.max(220, window.innerHeight - r.bottom - 18)}px)`;
+}
+window.addEventListener('resize', placeSelector);
 function toggleSelector(open) {
   const sel = $('#selector'), b = $('#open-selector');
   open = open ?? sel.hidden;
   if (!open || !b) { sel.hidden = true; return; }
-  const r = b.getBoundingClientRect();
-  sel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 380)) + 'px';
-  sel.style.top = (r.bottom + 6) + 'px';
-  sel.hidden = false; $('#sel-filter').value = '';
+  sel.hidden = false; placeSelector(); $('#sel-filter').value = '';
   PICKED = new Set(String(MODE).startsWith('multi:') ? slugsOf(MODE) : MENTORS.find(r => r.slug === MODE) ? [MODE] : []);
   paintSelector(); $('#sel-filter').focus();
 }
