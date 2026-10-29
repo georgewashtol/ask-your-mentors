@@ -181,6 +181,10 @@ button.link:hover, button.link.active { color: var(--text); background: var(--pa
 .big-icon { font-size: 40px; }
 .finder { text-align: left; display: flex; flex-direction: column; gap: 12px; }
 .finder .s-query { font-size: 16px; padding: 12px 14px; }
+.finder-box { display: flex; flex-direction: column; gap: 12px; }
+.add-modes { display: flex; gap: 6px; flex-wrap: wrap; }
+.add-modes .chip { font-size: 13px; padding: 5px 12px; }
+.finder.manual p { margin: 0; }
 .s-output { display: flex; flex-direction: column; gap: 10px; }
 .s-output .waiting { padding: 10px 2px; }
 .candidate { background: var(--panel); border: 1px solid var(--border2); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 10px; }

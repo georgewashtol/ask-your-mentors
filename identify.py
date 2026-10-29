@@ -77,6 +77,16 @@ def begin(q: str, hint: str = "") -> int:
     return sid
 
 
+def cancel(sid: int) -> None:
+    """The user typed another name or pressed Stop: the search is dropped and its Claude process is cut."""
+    with _lock:
+        s = _searches.get(sid)
+        if not s or s["status"] != "searching":
+            return
+        s.update(status="cancelled", refining=False)
+    ai.stop(f"search{sid}")
+
+
 def status(sid: int) -> dict:
     with _lock:
         s = _searches.get(sid)
@@ -94,10 +104,12 @@ def _run(sid: int, q: str, hint: str, cfg: dict, engine: str) -> None:
         out["error"] = str(e)[:600]
     if engine in ("claude", "gemini"):
         with _lock:
+            if _searches.get(sid, {}).get("status") == "cancelled":
+                return                                   # cancelled during the basic search: Claude is not even started
             _searches[sid].update(candidates=basic, refining=True)
         # 2. Claude checks the hints, completes the official channels and drops what is not theirs (~30 s)
         try:
-            found = _with_claude(q, hint, cfg, basic)
+            found = _with_claude(q, hint, cfg, basic, sid)
             out["candidates"] = enrich(found) if found else basic
             if not found and basic:
                 out["notice"] = tr("The AI found no one; these results come from the basic search.",
@@ -116,22 +128,24 @@ def _run(sid: int, q: str, hint: str, cfg: dict, engine: str) -> None:
     if out["error"] and not out["candidates"]:
         out["status"] = "error"
     with _lock:
+        if _searches.get(sid, {}).get("status") == "cancelled":
+            return                                       # nobody is waiting for it any more
         _searches[sid].update(out, refining=False)
 
 
-def _with_claude(q: str, hint: str, cfg: dict, basic: list) -> list:
+def _with_claude(q: str, hint: str, cfg: dict, basic: list, sid: int = 0) -> list:
     extra = f'\nUser hint (the first try was not the right person): "{hint}"\n' if hint else "\n"
     hints = "\n".join(f"- {c['name']}: " + ", ".join(f"{f['type']} {f['url']} ({f['name']})" for f in c["sources"])
                       for c in basic) or "(no hints)"
     prompt = (PROMPT.format(q=q, hint=extra, lang=language_name()) +
               f"\n\nHINTS from the automatic search (they may include channels that are NOT the person's; check which are official):\n{hints}")
     if cfg.get("provider") == "gemini":                  # Gemini searches with Google Search grounding
-        r = ai.ask(prompt, cfg, web=True, schema=SCHEMA, timeout=240)
+        r = ai.ask(prompt, cfg, web=True, schema=SCHEMA, timeout=240, key=f"search{sid}")
     else:
         model = cfg.get("search_model") or "sonnet"      # checking channels does not need the biggest model
         # an empty folder: looking someone up never needs (or sees) the data folder with the settings
         r = ai.ask(prompt, {**cfg, "provider": "claude", "claude_model": model}, web=True, schema=SCHEMA,
-                   cwd=tempfile.mkdtemp(prefix="aym-search-"), timeout=240)
+                   cwd=tempfile.mkdtemp(prefix="aym-search-"), timeout=240, key=f"search{sid}")
     if r["error"]:
         raise RuntimeError(r["error"])
     return clean_candidates((r.get("data") or {}).get("candidates") or [])

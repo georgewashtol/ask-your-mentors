@@ -36,6 +36,25 @@ MAX_DOCUMENT = 56 * 1024 * 1024          # a PDF of up to ~40 MB arrives as base
 
 # ---------------------------------------------------------------- mentors
 
+def free_slug(name: str) -> str:
+    """The same name twice does not clash: the second one gets a suffix."""
+    slug = store.slug_of(name)
+    base, n = slug, 2
+    while store.mentor(slug):
+        slug, n = f"{base[:56]}-{n}", n + 1
+    return slug
+
+
+def add_manual_mentor(d: dict) -> dict:
+    """A mentor added by hand (an author whose books you have in PDF): only the name; the UI then uploads
+    the files and links with the same routes an existing mentor uses."""
+    name = re.sub(r"\s+", " ", str(d.get("name") or "")).strip()[:80]
+    if len(name) < 2:
+        raise ValueError(tr("Type the person's name.", "Escribe el nombre de la persona."))
+    language = re.sub(r"[^a-z]", "", str(d.get("language") or "").lower())[:2] or store.config().get("language") or "en"
+    return store.save_mentor({"name": name, "slug": free_slug(name), "language": language, "profile": "", "sources": []}, new=True)
+
+
 def add_mentor(d: dict) -> dict:
     """Saves the candidate the user confirmed and starts the download (then the AI writes the profile)."""
     found = identify.clean_candidates([d])
@@ -45,10 +64,7 @@ def add_mentor(d: dict) -> dict:
     c = found[0]
     import thumbnails
     c["sources"] = [f if str(f.get("image", "")).startswith("/thumb/") else thumbnails.complete(f) for f in c["sources"]]
-    slug = store.slug_of(c["name"])
-    base, n = slug, 2
-    while store.mentor(slug):
-        slug, n = f"{base[:56]}-{n}", n + 1
+    slug = free_slug(c["name"])
     intro = tr("**Who they are.** {d}", "**Quién es.** {d}", d=c["description"]) if c["description"] else ""
     m = store.save_mentor({"name": c["name"], "slug": slug, "language": c["language"] or "en",
                            "profile": intro, "sources": c["sources"]}, new=True)
@@ -383,8 +399,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.chat_action(path.rsplit("/", 1)[1], d)
         if path == "/api/identify":
             return self.send_json({"id": identify.begin(str(d.get("q") or ""), str(d.get("hint") or ""))})
+        if path == "/api/identify/cancel":
+            identify.cancel(int(d.get("id") or 0))
+            return self.send_json({"ok": True})
         if path == "/api/mentors":
             return self.send_json({"ok": True, "mentor": add_mentor(d)})
+        if path == "/api/mentors/manual":
+            return self.send_json({"ok": True, "mentor": add_manual_mentor(d)})
         if path == "/api/mentors/source":
             # one link ({"url"}) or several found by the search ({"sources": [{"url", "name"}]}); one download for all
             m = store.mentor(str(d.get("slug") or ""))
@@ -431,7 +452,8 @@ class Handler(BaseHTTPRequestHandler):
             m = re.match(r"^data:[^;,]*;base64,([A-Za-z0-9+/=]+)$", str(d.get("data") or ""))
             if not m:
                 raise ValueError(tr("Invalid file.", "Archivo inválido."))
-            return self.send_json(ingest.upload_document(str(d.get("slug") or ""), name, base64.b64decode(m.group(1))))
+            return self.send_json(ingest.upload_document(str(d.get("slug") or ""), name, base64.b64decode(m.group(1)),
+                                                         profile=d.get("profile") is not False))
         if path == "/api/mentors/delete":
             ingest.cancel_mentor(str(d.get("slug") or ""))     # a download in progress would recreate its folder
             store.delete_mentor(str(d.get("slug") or ""), files=bool(d.get("files")))

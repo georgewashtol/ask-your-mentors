@@ -435,8 +435,9 @@ def _web(d: Path, src: dict, m: dict, log: Log) -> str:
     return texts.document(d, target, src["url"], m["name"], m["language"], src.get("name", ""))
 
 
-def upload_document(slug: str, name: str, data: bytes) -> dict:
-    """A PDF, TXT, MD or HTML uploaded from the computer: saved in raw/ and added as one of the mentor's sources."""
+def upload_document(slug: str, name: str, data: bytes, profile: bool = True) -> dict:
+    """A PDF, TXT, MD or HTML uploaded from the computer: saved in raw/ and added as one of the mentor's sources.
+    profile=False while more files of the same batch are coming: the profile is written after the last one."""
     m = store.mentor(slug)
     if not m:
         raise ValueError(tr("That mentor does not exist.", "Ese referente no existe."))
@@ -450,7 +451,8 @@ def upload_document(slug: str, name: str, data: bytes) -> dict:
     sources = [s for s in m["sources"] if not (s["type"] == "file" and s.get("id") == sid)]
     sources.append({"type": "file", "name": name, "id": sid})
     store.save_mentor({**m, "sources": sources}, new=False)
-    _profile_if_missing(slug)
+    if profile:
+        _profile_if_missing(slug)
     return {"ok": True, "note": note}
 
 

@@ -2,7 +2,7 @@
 
 This repo is **Ask Your Mentors**: a local web app (standard-library Python + SQLite + vanilla HTML/JS) that downloads the YouTube and podcast transcripts of the people the user picks and lets them ask those people questions, with citations to the minute.
 
-**How this repo is used:** the screen has the minimum (add a mentor with one field and chat). Everything else the user customizes by asking you. Your job is to make those changes without breaking the app, following this guide.
+**How this repo is used:** the screen has the minimum (add a mentor with one field, or by hand with a name plus PDFs or links, and chat). Everything else the user customizes by asking you. Your job is to make those changes without breaking the app, following this guide.
 
 **Language:** everything in the code is in English. The app speaks English by default and Spanish when `data/config.json` has `"language": "es"` (the user switches it from the sidebar, or asks you). If the user writes to you in Spanish, answer in Spanish, but keep code, names and comments in English.
 

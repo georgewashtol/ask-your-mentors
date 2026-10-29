@@ -9,7 +9,7 @@ Open source · runs on your computer · AI optional · English and Spanish · <a
 
 ## What it does
 
-- **Type a name, get a mentor.** The app finds their YouTube channel and podcast, you confirm, and it downloads the transcripts (text only, never video).
+- **Type a name, get a mentor.** The app finds their YouTube channel and podcast, you confirm, and it downloads the transcripts (text only, never video). Wrong person? Type another name and press Enter: the old search stops. An author you only have in books? Add them by hand with their name and one or several PDFs.
 - **Ask anything.** One mentor, several at once, or let the AI pick who has something real to say. Every idea links to the minute it was said.
 - **Works without AI.** Base mode answers in under a second with their exact words. Turn the AI on for written answers that connect ideas (Claude Code, or Gemini for free).
 - **Yours.** Everything lives on your computer. Optional: connect your own notes (second brain) so the advice fits your life.

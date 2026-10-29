@@ -168,13 +168,28 @@
 </dialog>
 
 <template id="tpl-finder">
-  <form class="finder">
-    <div class="form-row">
-      <input class="s-query" maxlength="200" autocomplete="off" aria-label="Who do you want to learn from?" data-es-aria="¿De quién quieres aprender?" placeholder="Type a name: Alex Hormozi, Naval Ravikant, Cal Newport…" data-es-placeholder="Escribe un nombre: Llados, Mario Peláez, Adrià Solà Pastor…">
-      <button type="submit" class="primary s-go" data-es="Buscar">Search</button>
+  <div class="finder-box">
+    <div class="add-modes" role="tablist">
+      <button type="button" class="chip active" role="tab" data-add="search" data-es="🔎 Buscar en internet">🔎 Search online</button>
+      <button type="button" class="chip" role="tab" data-add="manual" data-es="📄 Manual: nombre + PDFs o enlaces">📄 Manual: name + PDFs or links</button>
     </div>
-    <div class="s-output"></div>
-  </form>
+    <form class="finder">
+      <div class="form-row">
+        <input class="s-query" maxlength="200" autocomplete="off" aria-label="Who do you want to learn from?" data-es-aria="¿De quién quieres aprender?" placeholder="Type a name: Alex Hormozi, Naval Ravikant, Cal Newport…" data-es-placeholder="Escribe un nombre: Llados, Mario Peláez, Adrià Solà Pastor…">
+        <button type="submit" class="primary s-go" data-es="Buscar">Search</button>
+        <button type="button" class="s-stop" hidden data-es="Detener">Stop</button>
+      </div>
+      <div class="s-output"></div>
+    </form>
+    <form class="finder manual" hidden>
+      <p class="muted small" data-es="Para un autor cuyos libros tienes en PDF, o alguien que no aparece en internet. El referente se arma solo con lo que subas.">For an author whose books you have as PDFs, or someone who is not online. The mentor is built only from what you upload.</p>
+      <label><span data-es="Nombre">Name</span><input class="m-name" maxlength="80" autocomplete="off" placeholder="E.g. Viktor Frankl" data-es-placeholder="Ej. Viktor Frankl"></label>
+      <label><span data-es="PDFs o textos (uno o varios)">PDFs or texts (one or several)</span><input class="m-files" type="file" multiple accept=".pdf,.txt,.md,.html,.htm"></label>
+      <label><span data-es="Enlaces, uno por línea (opcional): YouTube, podcast, página web o PDF">Links, one per line (optional): YouTube, podcast, web page or PDF</span><textarea class="m-links" rows="3" placeholder="https://…"></textarea></label>
+      <div class="form-row"><button type="submit" class="primary m-go" data-es="Crear referente">Create mentor</button></div>
+      <div class="m-output"></div>
+    </form>
+  </div>
 </template>
 
 <div id="context-menu" class="context-menu" hidden role="menu"></div>

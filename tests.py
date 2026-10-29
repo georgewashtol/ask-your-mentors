@@ -42,6 +42,9 @@ text = " ".join(args) + ("" if args[:2] == ["auth", "status"] else sys.stdin.rea
 if args[:2] == ["auth", "status"]:
     print(json.dumps({"loggedIn": True}))
 elif "--json-schema" in args:
+    if "SLOW" in text:
+        import time
+        time.sleep(30)
     data = {"candidates": [{"name": "Cal Newport", "description": "Computer science professor and author of Deep Work.",
             "language": "en", "sources": [{"type": "youtube", "url": "https://www.youtube.com/@CalNewportMedia", "name": "Cal Newport"},
                                           {"type": "rss", "url": "http://127.0.0.1:9/feed.xml", "name": "Deep Questions"},
@@ -167,6 +170,32 @@ class Server(unittest.TestCase):
         # the same name again does not clash: it gets a suffix
         self.assertEqual(self.post("/api/mentors", c)["mentor"]["slug"], "cal-newport-2")
         self.post("/api/mentors/delete", {"slug": "cal-newport-2", "files": True})
+
+    def test_04b_identify_can_be_cancelled(self):
+        sid = self.post("/api/identify", {"q": "SLOW person"})["id"]
+        t0 = time.time()
+        while self.get(f"/api/identify?id={sid}").get("refining") is not True and time.time() - t0 < 20:
+            time.sleep(0.2)                                  # Claude is checking the channels
+        self.post("/api/identify/cancel", {"id": sid})
+        self.assertEqual(self.get(f"/api/identify?id={sid}")["status"], "cancelled")
+        time.sleep(1.5)                                      # the cut Claude does not write over the cancellation
+        self.assertEqual(self.get(f"/api/identify?id={sid}")["status"], "cancelled")
+        self.assertLess(time.time() - t0, 25)
+
+    def test_04c_manual_mentor_with_documents(self):
+        m = self.post("/api/mentors/manual", {"name": "Viktor Frankl", "language": "es"})["mentor"]
+        self.assertEqual((m["slug"], m["language"], m["sources"]), ("viktor-frankl", "es", []))
+        import base64
+        doc = lambda t: "data:text/plain;base64," + base64.b64encode(t.encode()).decode()
+        self.post("/api/mentors/file", {"slug": "viktor-frankl", "name": "one.txt", "data": doc("Meaning first. " * 40), "profile": False})
+        self.post("/api/mentors/file", {"slug": "viktor-frankl", "name": "two.txt", "data": doc("Freedom to choose. " * 40)})
+        m = next(x for x in self.get("/api/mentors")["mentors"] if x["slug"] == "viktor-frankl")
+        self.assertEqual([s["name"] for s in m["sources"]], ["one.txt", "two.txt"])
+        self.assertEqual(self.post("/api/mentors/manual", {"name": "Viktor Frankl"})["mentor"]["slug"], "viktor-frankl-2")
+        with self.assertRaises(urllib.error.HTTPError):
+            self.post("/api/mentors/manual", {"name": " "})
+        for slug in ("viktor-frankl", "viktor-frankl-2"):
+            self.post("/api/mentors/delete", {"slug": slug, "files": True})
 
     def test_05_rejects_invalid_sources(self):
         with self.assertRaises(urllib.error.HTTPError):

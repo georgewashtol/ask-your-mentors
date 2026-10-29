@@ -648,29 +648,57 @@ $('#resizer').addEventListener('dblclick', () => { saveLS(SB_WIDTH, String(SB_DE
 
 // ---------------------------------------------------------------- mentor finder (one field)
 // The AI looks the person up on the internet and proposes candidates; the user says "yes, this one" and that's it.
+// Or, by hand: a name plus PDFs or links (an author whose books you have), with no search at all.
+let STOP_FINDER = () => {};
 function mountFinder(box, onAdded, target = null) {   // target: an existing mentor that gets the chosen sources
+  STOP_FINDER();                                        // a finder mounted before (welcome or dialog) stops its search
   box.innerHTML = '';
-  const f = $('#tpl-finder').content.firstElementChild.cloneNode(true);
-  translateDom(f);
-  box.appendChild(f);
-  const q = f.querySelector('.s-query'), out = f.querySelector('.s-output'), go = f.querySelector('.s-go');
-  let first = '';
+  const root = $('#tpl-finder').content.firstElementChild.cloneNode(true);
+  translateDom(root);
+  box.appendChild(root);
+  const f = root.querySelector('form.finder:not(.manual)'), manual = root.querySelector('form.manual');
+  const q = f.querySelector('.s-query'), out = f.querySelector('.s-output'), go = f.querySelector('.s-go'), stopBtn = f.querySelector('.s-stop');
+  if (target) root.querySelector('.add-modes').hidden = true;     // adding sources to someone who exists: only the search
+  root.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => {
+    const isManual = b.dataset.add === 'manual';
+    root.querySelectorAll('[data-add]').forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-selected', x === b); });
+    f.hidden = isManual; manual.hidden = !isManual;
+    if (isManual && !manual.querySelector('.m-name').value) manual.querySelector('.m-name').value = q.value.trim();
+    (isManual ? manual.querySelector('.m-name') : q).focus();
+  }));
+  mountManual(manual, onAdded);
+  let first = '', run = 0, sid = 0;
+  // Typing another name and pressing Enter, or Stop: the search in progress is dropped (and its Claude process cut)
+  function stop(note) {
+    run++;
+    if (sid) api('/api/identify/cancel', { id: sid }).catch(() => {});
+    sid = 0; stopBtn.hidden = true;
+    if (note) out.innerHTML = `<p class="muted">${L('Search stopped. Type another name or search again.', 'Búsqueda detenida. Escribe otro nombre o vuelve a buscar.')}</p>`;
+  }
+  STOP_FINDER = () => stop(false);
+  stopBtn.addEventListener('click', () => { stop(true); q.focus(); });
   async function search(text, hint) {
-    go.disabled = true;
+    stop(false);
+    const my = run;
+    stopBtn.hidden = false;
     const who = STATUS.provider === 'claude' && STATUS.ai_ready ? L('Claude is searching for', 'Claude está buscando') : L('Searching for', 'Buscando');
     out.innerHTML = `<div class="waiting"><span class="dot"></span>${who} <b>${esc(text)}</b> ${L('on the internet: YouTube channels, podcasts and texts…', 'en internet: canales de YouTube, podcasts y textos…')}</div>`;
     try {
       const { id } = await api('/api/identify', { q: text, hint });
+      if (my !== run) return api('/api/identify/cancel', { id }).catch(() => {});   // stopped while it was starting
+      sid = id;
       let r, painted = false;
       for (;;) {
         await new Promise(ok => setTimeout(ok, 1200));
+        if (my !== run) return;                         // another name was searched, or Stop
         r = await api(`/api/identify?id=${id}`);
+        if (my !== run) return;
         if (r.status !== 'searching') break;
         if (r.refining && r.candidates && r.candidates.length && !painted) { paintCandidates(r, text, true); painted = true; }
       }
       paintCandidates(r, text, false);
-    } catch (e) { out.innerHTML = `<div class="error">${esc(e.message)}</div>`; }
-    go.disabled = false;
+    } catch (e) { if (my === run) out.innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+    if (my === run) { sid = 0; stopBtn.hidden = true; }
   }
   function paintCandidates(r, text, refining) {
     if (r.status === 'error') { out.innerHTML = `<div class="error">${esc(r.error)}</div>`; return; }
@@ -712,6 +740,7 @@ function mountFinder(box, onAdded, target = null) {   // target: an existing men
         await loadMentors(); if (onAdded) onAdded(target); paintMentors(); refreshJobs(true);
         return;
       }
+      stop(false);                                     // Claude was still refining: the user already chose
       const { mentor } = await api('/api/mentors', { ...c, sources });
       await loadMentors();
       if (onAdded) onAdded(mentor);
@@ -727,13 +756,49 @@ function mountFinder(box, onAdded, target = null) {   // target: an existing men
   });
   setTimeout(() => q.focus(), 50);
 }
+// Manual: the name, one or several PDFs/texts and optional links; the same routes as "+ Add" on an existing mentor
+function mountManual(form, onAdded) {
+  const out = form.querySelector('.m-output'), go = form.querySelector('.m-go');
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const name = form.querySelector('.m-name').value.trim(), files = [...form.querySelector('.m-files').files];
+    const links = form.querySelector('.m-links').value.split(/\s+/).map(x => x.trim()).filter(Boolean);
+    const say = (html, cls = 'muted') => { out.innerHTML = `<p class="${cls}">${html}</p>`; };
+    if (name.length < 2) { form.querySelector('.m-name').focus(); return say(L('Type the person\'s name.', 'Escribe el nombre de la persona.'), 'error'); }
+    if (!files.length && !links.length) return say(L('Upload at least one PDF or text, or paste a link.', 'Sube al menos un PDF o texto, o pega un enlace.'), 'error');
+    const bad = links.find(u => !/^https?:\/\/\S+$/.test(u));
+    if (bad) return say(L(`This link must start with https://: ${esc(bad)}`, `Este enlace debe empezar con https://: ${esc(bad)}`), 'error');
+    if (links.length > 10) return say(L('At most 10 links at once.', 'Máximo 10 enlaces a la vez.'), 'error');
+    const big = files.find(x => x.size > MAX_UPLOAD);
+    if (big) return say(L(`${esc(big.name)} is larger than 40 MB.`, `${esc(big.name)} pesa más de 40 MB.`), 'error');
+    go.disabled = true;
+    const failed = [];
+    try {
+      const { mentor } = await api('/api/mentors/manual', { name, language: LANG });
+      for (const [i, file] of files.entries()) {
+        out.innerHTML = `<div class="waiting"><span class="dot"></span>${L(`Reading ${i + 1} of ${files.length}: ${esc(file.name)}…`, `Leyendo ${i + 1} de ${files.length}: ${esc(file.name)}…`)}</div>`;
+        // the profile is written once, after the last file
+        try { await sendDocument(mentor.slug, file, i === files.length - 1); } catch (e) { failed.push(`${file.name}: ${e.message}`); }
+      }
+      if (links.length) {
+        try { await api('/api/mentors/source', { slug: mentor.slug, sources: links.map(url => ({ url })) }); } catch (e) { failed.push(e.message); }
+      }
+      await loadMentors();
+      if (failed.length) alert(L('The mentor was created, but this failed:\n', 'El referente quedó creado, pero esto falló:\n') + failed.join('\n'));
+      if (onAdded) onAdded(mentor);
+      showView('mentors');
+      refreshJobs(true);
+    } catch (e) { say(esc(e.message), 'error'); }
+    go.disabled = false;
+  });
+}
 function openAdd(target = null) {
   if (!target || !target.slug) target = null;            // only a mentor, never a click event
   $('#dlg-add h2').textContent = target ? L(`Find sources for ${target.name}`, `Buscar fuentes de ${target.name}`) : L('Add a mentor', 'Agregar referente');
   mountFinder($('#finder-dlg'), () => $('#dlg-add').close(), target);
   if (target) $('#finder-dlg .s-query').value = target.name;
   $('#dlg-add').showModal();
-  if (target) $('#finder-dlg form').requestSubmit();
+  if (target) $('#finder-dlg form.finder').requestSubmit();
 }
 // "+ Add" inside a mentor's sources: search online by name, paste a link, or upload a PDF
 const PDF_ICON = '<svg class="platform" viewBox="0 0 24 24" aria-hidden="true">' + SVG.pdf + '</svg>';
@@ -754,6 +819,7 @@ function openSourceMenu(slug, anchor) {
 }
 $('#add-mentor').addEventListener('click', () => openAdd());
 $('#close-add').addEventListener('click', () => $('#dlg-add').close());
+$('#dlg-add').addEventListener('close', () => STOP_FINDER());     // closing the dialog drops the search in progress
 
 // ---------------------------------------------------------------- your mentors
 let JOBS = [], JOBS_POLL = null;
@@ -910,18 +976,23 @@ function paintMaterial() {
 $('#mat-filter').addEventListener('input', paintMaterial);
 $('#close-material').addEventListener('click', () => $('#dlg-material').close());
 
+const MAX_UPLOAD = 40 * 1024 * 1024;
+function sendDocument(slug, file, profile = true) {
+  return new Promise((ok, fail) => {
+    const reader = new FileReader();
+    reader.onerror = () => fail(new Error(L('Could not read the file.', 'No pude leer el archivo.')));
+    reader.onload = () => api('/api/mentors/file', { slug, name: file.name, data: reader.result, profile }).then(ok, fail);
+    reader.readAsDataURL(file);
+  });
+}
 function uploadDocument(slug) {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = '.pdf,.txt,.md,.html,.htm';
-  input.addEventListener('change', () => {
+  input.addEventListener('change', async () => {
     const f = input.files[0]; if (!f) return;
-    if (f.size > 40 * 1024 * 1024) return alert(L('The file is larger than 40 MB.', 'El archivo pesa más de 40 MB.'));
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try { const r = await api('/api/mentors/file', { slug, name: f.name, data: reader.result }); await loadMentors(); paintMentors(); alert(r.note || L('Document added.', 'Documento agregado.')); }
-      catch (e) { alert(e.message); }
-    };
-    reader.readAsDataURL(f);
+    if (f.size > MAX_UPLOAD) return alert(L('The file is larger than 40 MB.', 'El archivo pesa más de 40 MB.'));
+    try { const r = await sendDocument(slug, f); await loadMentors(); paintMentors(); alert(r.note || L('Document added.', 'Documento agregado.')); }
+    catch (e) { alert(e.message); }
   });
   input.click();
 }
