@@ -13,8 +13,8 @@ jobs:
         python: ["3.9", "3.13"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
       - if: runner.os == 'Linux'
@@ -26,8 +26,8 @@ jobs:
   windows:
     runs-on: windows-latest      # imports only: the fake Claude used by the tests is a Unix script
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
       - run: python -c "import app, advisor, ingest, fulltext, brain, net; print('imports ok')"
