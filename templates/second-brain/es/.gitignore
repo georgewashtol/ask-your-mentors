@@ -1,0 +1,11 @@
+# Nunca subir secretos
+.env
+*.key
+*.pem
+secretos/
+# Sistema y editores
+.DS_Store
+__pycache__/
+.obsidian/workspace*.json
+.obsidian/cache
+.vscode/

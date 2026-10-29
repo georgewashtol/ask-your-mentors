@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "Ask Your Mentors",
+    "icon": ""
+  },
+  "language": "en",
+  "ai_enabled": true,
+  "brain": {
+    "enabled": false,
+    "path": ""
+  },
+  "user_name": "",
+  "corpus": "data/corpus",
+  "initial_download": 30,
+  "initial_mentors": [
+    {
+      "name": "Jorge Toledo",
+      "language": "es",
+      "description": "Author of this app. His channel and his podcast Sintonizando Gratitud: action, mindset and business, straight to the point (in Spanish).",
+      "sources": [
+        {
+          "type": "youtube",
+          "url": "https://www.youtube.com/@georgewashtol",
+          "name": "Jorge Toledo"
+        }
+      ]
+    }
+  ],
+  "whisper_model": "",
+  "ai": {
+    "provider": "claude",
+    "search_model": "sonnet",
+    "claude_model": "sonnet",
+    "codex_model": "",
+    "gemini_model": "gemini-flash-latest",
+    "gemini_key": "",
+    "ollama_model": "llama3.1",
+    "ollama_url": "http://127.0.0.1:11434",
+    "command": "",
+    "claude_bin": "",
+    "codex_bin": ""
+  }
+}

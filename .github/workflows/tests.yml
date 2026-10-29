@@ -1,0 +1,32 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.9", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python tests.py
+      - run: python app.py --check || true
+
+  windows:
+    runs-on: windows-latest
+    continue-on-error: true      # the fake Claude used by the tests is a Unix script; the app itself is cross-platform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -c "import app, advisor, ingest, fulltext, brain, net; print('imports ok')"
+      - run: python app.py --check

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask Your Mentors</title>
+<link rel="icon" href="/favicon.svg?v=4" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+</head>
+<!-- Texts are written in English; data-es / data-es-html / data-es-placeholder / data-es-title / data-es-aria hold
+     the Spanish version, which app.js applies when the language is "es". -->
+<body class="loading">
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">
+      <span id="brand-icon" class="logo"><img src="/logo.svg" alt="" width="34" height="34"></span><b id="brand-name" title="Ask Your Mentors"><span class="name-full">Ask Your Mentors</span><span class="name-mid">Ask Mentors</span><span class="name-short">AYM</span></b>
+      <button type="button" id="hide-sidebar" class="icon-btn panel" title="Hide the chats panel (Ctrl/Cmd+B)" data-es-title="Ocultar el panel de charlas (Ctrl/Cmd+B)" aria-label="Hide the chats panel" data-es-aria="Ocultar el panel de charlas"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 4v16" stroke="currentColor" stroke-width="1.8"/><path d="M6 9h1M6 12h1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    </div>
+    <button id="new-chat" class="primary" data-es="+ Nueva charla">+ New chat</button>
+    <div id="chats" class="chats">
+      <div class="sk sk-section"></div>
+      <div class="sk sk-chat"></div><div class="sk sk-chat"></div><div class="sk sk-chat"></div>
+      <div class="sk sk-chat"></div><div class="sk sk-chat"></div><div class="sk sk-chat"></div>
+    </div>
+    <div class="footer">
+      <div class="footer-buttons">
+        <div class="switches">
+        <div class="ai-row">
+          <button type="button" id="ai-switch" class="switch" role="switch" aria-checked="false" aria-labelledby="ai-label" title="Turn the AI on or off" data-es-title="Encender o apagar la IA"><span class="knob"></span></button>
+          <span class="switch-text"><b id="ai-label" data-es="Usar IA">Use AI</b><button type="button" id="ai-detail" class="link-btn"></button></span>
+        </div>
+        <div class="ai-row">
+          <button type="button" id="brain-switch" class="switch" role="switch" aria-checked="false" aria-labelledby="brain-label" title="Let the AI read your own notes to personalize the answers" data-es-title="Dejar que la IA lea tus propias notas para personalizar las respuestas"><span class="knob"></span></button>
+          <span class="switch-text"><b id="brain-label" data-es="Segundo cerebro">Second brain</b><button type="button" id="brain-detail" class="link-btn"></button></span>
+        </div>
+        </div>
+        <div class="lang-seg" role="group" aria-label="Language" data-es-aria="Idioma">
+          <button type="button" class="seg" data-lang="en" aria-pressed="false" title="English"><svg class="flag" viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#fff"/><path d="M0 0h30v2.86H0zM0 5.71h30v2.86H0zM0 11.43h30v2.86H0zM0 17.14h30V20H0z" fill="#b22234"/><rect width="13" height="10.8" fill="#3c3b6e"/></svg>EN</button>
+          <button type="button" class="seg" data-lang="es" aria-pressed="false" title="Español"><svg class="flag" viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#c60b1e"/><rect y="5" width="30" height="10" fill="#ffc400"/></svg>ES</button>
+        </div>
+      </div>
+      <div class="credit"><img src="/washtol.png" alt="" width="16" height="16"><span data-es-html='Creado por <a href="https://washtol.com" target="_blank" rel="noopener noreferrer" title="Washtol Company">Washtol</a>'>Created by
+        <a href="https://washtol.com" target="_blank" rel="noopener noreferrer" title="Washtol Company">Washtol</a></span></div>
+    </div>
+  </aside>
+
+  <div id="resizer" role="separator" aria-orientation="vertical" title="Drag to change the width (double click to reset)" data-es-title="Arrastra para cambiar el ancho (doble clic para restablecer)"></div>
+
+  <main id="main">
+    <!-- ============ CHAT ============ -->
+    <section id="view-chat" class="view">
+      <div id="modes">
+        <button type="button" id="show-sidebar" class="icon-btn panel" title="Show the chats panel (Ctrl/Cmd+B)" data-es-title="Mostrar el panel de charlas (Ctrl/Cmd+B)" aria-label="Show the chats panel" data-es-aria="Mostrar el panel de charlas" hidden><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 4v16" stroke="currentColor" stroke-width="1.8"/><path d="M6 9h1M6 12h1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <div id="chips" class="chips" role="group" aria-label="Who do you ask?" data-es-aria="¿A quién le preguntas?">
+          <span class="sk sk-chip"></span><span class="sk sk-chip"></span><span class="sk sk-chip wide"></span>
+        </div>
+        <div id="tools" class="tools">
+          <button type="button" id="open-mentors" class="pill">👥 <span id="n-mentors" data-es="Mis referentes">My mentors</span></button>
+        </div>
+      </div>
+      <section id="thread" class="thread">
+        <div class="empty sk-empty"><div class="sk sk-title"></div><div class="sk sk-line"></div><div class="sk sk-line short"></div></div>
+      </section>
+      <form id="question-form" class="composer">
+        <label for="question" class="sr-only" data-es="Tu pregunta">Your question</label>
+        <textarea id="question" rows="1" placeholder="Type your question. Enter sends, Shift+Enter adds a line." data-es-placeholder="Escribe tu pregunta. Enter envía, Shift+Enter agrega una línea."></textarea>
+        <button type="button" id="stop" class="danger" hidden title="Stop the answer in progress" data-es-title="Detener la respuesta en curso" data-es="⏹ Detener">⏹ Stop</button>
+        <button type="submit" id="send" class="primary">Send</button>
+      </form>
+      <p class="fine-print" data-es="Simulación basada en su contenido público: los referentes no avalan estas respuestas.">A simulation based on their public content: the mentors do not endorse these answers.</p>
+    </section>
+
+    <!-- ============ MENTORS ============ -->
+    <section id="view-mentors" class="view page" hidden>
+      <header class="page-header">
+        <div>
+          <h1 data-es="Mis referentes">My mentors</h1>
+          <p class="muted" data-es="Las personas de las que aprendes. La app descarga lo que dicen en sus videos, podcasts y textos, y la IA escribe su perfil: cómo piensa y cómo habla.">The people you learn from. The app downloads what they say in their videos, podcasts and texts, and the AI writes their profile: how they think and how they talk.</p>
+        </div>
+        <div class="header-buttons">
+          <button type="button" id="back-to-chat" data-es="← Volver a las charlas">← Back to chats</button>
+          <button type="button" id="add-mentor" class="primary" data-es="+ Agregar">+ Add</button>
+        </div>
+      </header>
+      <div id="mentor-list" class="mentor-rows"></div>
+      <p class="notice" data-es="El contenido de terceros es para estudio personal: respeta los términos de cada plataforma y no redistribuyas las transcripciones.">Third-party content is for personal study: respect each platform's terms and do not redistribute the transcripts.</p>
+    </section>
+  </main>
+</div>
+
+<!-- ============ Dialog: add a mentor ============ -->
+<dialog id="dlg-add" class="dialog">
+  <div class="dlg-body">
+    <div class="dlg-head"><h2 data-es="Agregar referente">Add a mentor</h2><button type="button" id="close-add" class="icon-btn" aria-label="Close" data-es-aria="Cerrar">✕</button></div>
+    <div id="finder-dlg"></div>
+  </div>
+</dialog>
+
+<!-- ============ Dialog: a mentor's material ============ -->
+<dialog id="dlg-material" class="dialog wide">
+  <div class="dlg-body">
+    <div class="dlg-head"><h2 id="mat-title">Material</h2><button type="button" id="close-material" class="icon-btn" aria-label="Close" data-es-aria="Cerrar">✕</button></div>
+    <div class="form-row"><input id="mat-filter" placeholder="Filter by title…" data-es-placeholder="Filtrar por título…" aria-label="Filter by title" data-es-aria="Filtrar por título"></div>
+    <p id="mat-summary" class="muted small"></p>
+    <div id="mat-list" class="mat-list"></div>
+  </div>
+</dialog>
+
+<!-- ============ Mentor picker ============ -->
+<div id="selector" class="selector" hidden role="dialog" aria-label="Pick mentors" data-es-aria="Elige referentes">
+  <div class="sel-head">
+    <input id="sel-filter" placeholder="Search a mentor…" data-es-placeholder="Buscar referente…" aria-label="Search a mentor" data-es-aria="Buscar referente" autocomplete="off">
+  </div>
+  <p class="muted small sel-help" data-es="Marca uno o varios: se guarda al instante. Si marcas varios, cada uno responde en su voz.">Check one or several: it is saved right away. If you check several, each one answers in their own voice.</p>
+  <div id="sel-list" class="sel-list"></div>
+  <div id="sel-footer" class="sel-footer"><span id="sel-count" class="muted small"></span></div>
+</div>
+
+
+<!-- ============ Dialog: connect Claude Code ============ -->
+<dialog id="dlg-connect" class="dialog">
+  <div class="dlg-body">
+    <div class="dlg-head"><h2 data-es="Encender la IA">Turn on the AI</h2><button type="button" id="close-connect" class="icon-btn" aria-label="Close" data-es-aria="Cerrar">✕</button></div>
+    <p class="muted" data-es="La IA redacta las respuestas de tus referentes, escribe su perfil y los busca en internet. Elige una; se conecta una sola vez.">The AI writes your mentors' answers and profiles, and finds them online. Pick one; you connect it only once.</p>
+    <div class="lang-seg ai-pick" role="group" aria-label="AI" data-es-aria="IA">
+      <button type="button" class="seg" data-pick="claude" aria-pressed="true"><span data-es="Claude Code · recomendada">Claude Code · recommended</span></button>
+      <button type="button" class="seg" data-pick="gemini" aria-pressed="false"><span data-es="Gemini · gratis">Gemini · free</span></button>
+    </div>
+    <div id="pick-claude">
+    <p class="muted small" data-es="La más inteligente: busca en las transcripciones como un agente y cita mejor. Necesita un plan Pro o Max de Claude (desde unos USD 20 al mes).">The smartest: it searches the transcripts like an agent and cites best. Needs a Claude Pro or Max plan (from about USD 20 a month).</p>
+    <ol class="steps">
+      <li data-step="account"><b data-es="Ten una cuenta de Claude con plan Pro o Max">Have a Claude account with a Pro or Max plan</b><span class="muted" data-es-html='El plan gratis no incluye Claude Code. Mejora tu plan en <a href="https://claude.ai/upgrade" target="_blank" rel="noopener noreferrer">claude.ai/upgrade</a>.'>The free plan does not include Claude Code. You can upgrade at <a href="https://claude.ai/upgrade" target="_blank" rel="noopener noreferrer">claude.ai/upgrade</a>.</span></li>
+      <li data-step="install"><b data-es="Instala Claude Code">Install Claude Code</b><span class="muted" data-es-html='Abre la app <b>Terminal</b> (en Mac: ⌘ + espacio y escribe «Terminal»), pega esto y presiona Enter:'>Open the <b>Terminal</b> app (on Mac: ⌘ + space and type “Terminal”), paste this and press Enter:</span>
+        <span class="command"><code id="cmd-install">curl -fsSL https://claude.ai/install.sh | bash</code><button type="button" class="small copy" data-copy="cmd-install" data-es="Copiar">Copy</button></span>
+        <span class="muted" data-es-html='En Windows o Linux sigue las instrucciones de <a href="https://claude.com/code" target="_blank" rel="noopener noreferrer">claude.com/code</a>.'>On Windows or Linux follow the instructions at <a href="https://claude.com/code" target="_blank" rel="noopener noreferrer">claude.com/code</a>.</span></li>
+      <li data-step="login"><b data-es="Inicia sesión">Log in</b><span class="muted" data-es="En la misma Terminal escribe esto y presiona Enter. Se abre el navegador: entra con tu cuenta de Claude y acepta.">In the same Terminal type this and press Enter. The browser opens: sign in with your Claude account and accept.</span>
+        <span class="command"><code id="cmd-login">claude auth login</code><button type="button" class="small copy" data-copy="cmd-login" data-es="Copiar">Copy</button></span></li>
+      <li data-step="check"><b data-es="Vuelve aquí y revisa">Come back here and check</b><span class="muted" data-es="Cuando el navegador diga que ya entraste, haz clic en el botón.">When the browser says you are in, press the button.</span></li>
+    </ol>
+    <div class="actions"><span id="connect-status" class="muted"></span><button type="button" id="check-connection" class="primary" data-es="Ya lo hice, revisar">Done, check it</button></div>
+    </div>
+    <div id="pick-gemini" hidden>
+    <p class="muted small" data-es="Gratis con cualquier cuenta de Google, con límites diarios. Más rápida pero menos precisa que Claude.">Free with any Google account, with daily limits. Faster but less precise than Claude.</p>
+    <p class="notice warn small" data-es="Aviso: en el plan gratis Google puede usar lo que envías (tu pregunta, los fragmentos y las notas que lea la IA) para mejorar sus productos, y personas pueden revisarlo. No la uses con información sensible.">Heads up: on the free plan Google may use what you send (your question, the excerpts and any notes the AI reads) to improve its products, and people may review it. Do not use it with sensitive information.</p>
+    <ol class="steps">
+      <li><b data-es="Crea tu clave gratis">Create your free key</b><span class="muted" data-es-html='Abre <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a>, entra con tu cuenta de Google y haz clic en <b>Create API key</b>.'>Open <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a>, sign in with your Google account and press <b>Create API key</b>.</span></li>
+      <li><b data-es="Cópiala y pégala aquí">Copy it and paste it here</b><span class="muted" data-es="Se guarda solo en tu computador (data/config.json) y nunca se muestra ni se exporta.">It is saved only on your computer (data/config.json) and is never shown or exported.</span>
+        <span class="command"><span class="secret-field"><input id="gemini-key" type="text" class="secret" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other" placeholder="AIza..." aria-label="Gemini API key" data-es-aria="Clave de Gemini"><button type="button" id="gemini-eye" class="eye" aria-pressed="false" title="Show or hide the key" data-es-title="Mostrar u ocultar la clave" aria-label="Show the key" data-es-aria="Mostrar la clave"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="eye-open" d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle class="eye-open" cx="12" cy="12" r="3"/><path class="eye-off" d="M3 3l18 18M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6A17.4 17.4 0 0 0 2 12s3.6 7 10 7a9.9 9.9 0 0 0 4.4-1"/></svg></button></span><button type="button" id="save-gemini" class="small primary" data-es="Guardar">Save</button></span></li>
+    </ol>
+    <p id="gemini-status" class="muted small"></p>
+    </div>
+    <p class="muted small" data-es="¿Otra IA (Codex, Ollama local)? Pídele a tu IA «configura la app para usar Ollama» (las instrucciones están en AGENTS.md).">Another AI (Codex, a local Ollama)? Ask your AI “set up the app to use Ollama” (the instructions are in AGENTS.md).</p>
+  </div>
+</dialog>
+
+<!-- ============ Dialog: second brain ============ -->
+<dialog id="dlg-brain" class="dialog">
+  <div class="dlg-body">
+    <div class="dlg-head"><h2 data-es="Segundo cerebro">Second brain</h2><button type="button" id="close-brain" class="icon-btn" aria-label="Close" data-es-aria="Cerrar">✕</button></div>
+    <p class="muted" data-es="Tus propias notas (Obsidian, Markdown, texto). Con la IA encendida, lee solo lo que importa para cada pregunta y nunca cambia nada.">Your own notes (Obsidian, Markdown, plain text). With the AI on, it reads only what matters for each question and never changes anything.</p>
+    <div class="options">
+      <button type="button" id="brain-pick" class="option"><span class="opt-icon">📂</span><span><b data-es="Ya tengo uno: elegir su carpeta">I have one: choose its folder</b><small data-es="Se abre el selector de carpetas de tu computador">Opens your computer's folder picker</small></span></button>
+      <button type="button" id="brain-create" class="option"><span class="opt-icon">✨</span><span><b data-es="Créame uno desde cero">Create one for me</b><small data-es="Una estructura lista con 8 áreas de tu vida y los prompts para llenarla con tu IA">A ready structure with 8 areas of your life and the prompts to fill it with your AI</small></span></button>
+    </div>
+    <p class="muted small"><button type="button" id="brain-type" class="link-btn" data-es="O escribe la ruta a mano">Or type the path by hand</button></p>
+    <p id="brain-status" class="small" aria-live="polite"></p>
+  </div>
+</dialog>
+
+<template id="tpl-finder">
+  <form class="finder">
+    <div class="form-row">
+      <input class="s-query" maxlength="200" autocomplete="off" aria-label="Who do you want to learn from?" data-es-aria="¿De quién quieres aprender?" placeholder="Type a name: Alex Hormozi, Naval Ravikant, Cal Newport…" data-es-placeholder="Escribe un nombre: Llados, Mario Peláez, Adrià Solà Pastor…">
+      <button type="submit" class="primary s-go" data-es="Buscar">Search</button>
+    </div>
+    <div class="s-output"></div>
+  </form>
+</template>
+
+<div id="context-menu" class="context-menu" hidden role="menu"></div>
+<script src="/markdown.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

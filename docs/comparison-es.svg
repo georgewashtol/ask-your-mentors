@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+<rect width="1200" height="675" fill="#111614"/>
+<text x="40" y="58" font-size="30" font-weight="700" fill="#F2EDE3">Ask Your Mentors: con y sin IA</text>
+<rect x="40" y="80" width="16" height="16" rx="3" fill="#F2EDE3"/><text x="64" y="94" font-size="16" fill="#cfd6d1">Modo base (sin IA)</text>
+<rect x="252.79999999999998" y="80" width="16" height="16" rx="3" fill="#6aa8ff"/><text x="276.79999999999995" y="94" font-size="16" fill="#cfd6d1">Gemini (gratis, key propia)</text>
+<rect x="543.0" y="80" width="16" height="16" rx="3" fill="#D4A94A"/><text x="567.0" y="94" font-size="16" fill="#cfd6d1">Claude Code (~USD 20/mes)</text>
+<text x="40" y="150" font-size="17" fill="#F2EDE3">Veracidad: de verdad lo dijo</text>
+<rect x="360" y="128" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="128" width="722" height="11" rx="3" fill="#F2EDE3"/>
+<text x="1132" y="138" font-size="12" fill="#a3ada6">95%</text>
+<rect x="360" y="142" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="142" width="570" height="11" rx="3" fill="#6aa8ff"/>
+<text x="1132" y="152" font-size="12" fill="#a3ada6">75%</text>
+<rect x="360" y="156" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="156" width="646" height="11" rx="3" fill="#D4A94A"/>
+<text x="1132" y="166" font-size="12" fill="#a3ada6">85%</text>
+<text x="40" y="204" font-size="17" fill="#F2EDE3">Autenticidad del tono (texto)</text>
+<rect x="360" y="182" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="182" width="684" height="11" rx="3" fill="#F2EDE3"/>
+<text x="1132" y="192" font-size="12" fill="#a3ada6">90%</text>
+<rect x="360" y="196" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="196" width="494" height="11" rx="3" fill="#6aa8ff"/>
+<text x="1132" y="206" font-size="12" fill="#a3ada6">65%</text>
+<rect x="360" y="210" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="210" width="608" height="11" rx="3" fill="#D4A94A"/>
+<text x="1132" y="220" font-size="12" fill="#a3ada6">80%</text>
+<text x="40" y="258" font-size="17" fill="#F2EDE3">Entiende la pregunta</text>
+<rect x="360" y="236" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="236" width="418" height="11" rx="3" fill="#F2EDE3"/>
+<text x="1132" y="246" font-size="12" fill="#a3ada6">55%</text>
+<rect x="360" y="250" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="250" width="570" height="11" rx="3" fill="#6aa8ff"/>
+<text x="1132" y="260" font-size="12" fill="#a3ada6">75%</text>
+<rect x="360" y="264" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="264" width="684" height="11" rx="3" fill="#D4A94A"/>
+<text x="1132" y="274" font-size="12" fill="#a3ada6">90%</text>
+<text x="40" y="312" font-size="17" fill="#F2EDE3">Conecta ideas y aconseja</text>
+<rect x="360" y="290" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="290" width="76" height="11" rx="3" fill="#F2EDE3"/>
+<text x="1132" y="300" font-size="12" fill="#a3ada6">10%</text>
+<rect x="360" y="304" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="304" width="532" height="11" rx="3" fill="#6aa8ff"/>
+<text x="1132" y="314" font-size="12" fill="#a3ada6">70%</text>
+<rect x="360" y="318" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="318" width="722" height="11" rx="3" fill="#D4A94A"/>
+<text x="1132" y="328" font-size="12" fill="#a3ada6">95%</text>
+<text x="40" y="366" font-size="17" fill="#F2EDE3">Fácil de leer</text>
+<rect x="360" y="344" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="344" width="342" height="11" rx="3" fill="#F2EDE3"/>
+<text x="1132" y="354" font-size="12" fill="#a3ada6">45%</text>
+<rect x="360" y="358" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="358" width="646" height="11" rx="3" fill="#6aa8ff"/>
+<text x="1132" y="368" font-size="12" fill="#a3ada6">85%</text>
+<rect x="360" y="372" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="372" width="722" height="11" rx="3" fill="#D4A94A"/>
+<text x="1132" y="382" font-size="12" fill="#a3ada6">95%</text>
+<text x="40" y="420" font-size="17" fill="#F2EDE3">Personalizada (segundo cerebro)</text>
+<rect x="360" y="398" width="760" height="11" rx="3" fill="#1c2723"/>
+<text x="1132" y="408" font-size="12" fill="#a3ada6">n/a</text>
+<rect x="360" y="412" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="412" width="494" height="11" rx="3" fill="#6aa8ff"/>
+<text x="1132" y="422" font-size="12" fill="#a3ada6">65%</text>
+<rect x="360" y="426" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="426" width="684" height="11" rx="3" fill="#D4A94A"/>
+<text x="1132" y="436" font-size="12" fill="#a3ada6">90%</text>
+<text x="40" y="474" font-size="17" fill="#F2EDE3">Rapidez</text>
+<rect x="360" y="452" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="452" width="752" height="11" rx="3" fill="#F2EDE3"/>
+<text x="1132" y="462" font-size="12" fill="#a3ada6">99%</text>
+<rect x="360" y="466" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="466" width="646" height="11" rx="3" fill="#6aa8ff"/>
+<text x="1132" y="476" font-size="12" fill="#a3ada6">85%</text>
+<rect x="360" y="480" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="480" width="532" height="11" rx="3" fill="#D4A94A"/>
+<text x="1132" y="490" font-size="12" fill="#a3ada6">70%</text>
+<text x="40" y="528" font-size="17" fill="#F2EDE3">Gratis para el usuario</text>
+<rect x="360" y="506" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="506" width="760" height="11" rx="3" fill="#F2EDE3"/>
+<text x="1132" y="516" font-size="12" fill="#a3ada6">100%</text>
+<rect x="360" y="520" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="520" width="684" height="11" rx="3" fill="#6aa8ff"/>
+<text x="1132" y="530" font-size="12" fill="#a3ada6">90%</text>
+<rect x="360" y="534" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="534" width="228" height="11" rx="3" fill="#D4A94A"/>
+<text x="1132" y="544" font-size="12" fill="#a3ada6">30%</text>
+<text x="40" y="582" font-size="17" fill="#F2EDE3">Privacidad</text>
+<rect x="360" y="560" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="560" width="760" height="11" rx="3" fill="#F2EDE3"/>
+<text x="1132" y="570" font-size="12" fill="#a3ada6">100%</text>
+<rect x="360" y="574" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="574" width="380" height="11" rx="3" fill="#6aa8ff"/>
+<text x="1132" y="584" font-size="12" fill="#a3ada6">50%</text>
+<rect x="360" y="588" width="760" height="11" rx="3" fill="#1c2723"/>
+<rect x="360" y="588" width="532" height="11" rx="3" fill="#D4A94A"/>
+<text x="1132" y="598" font-size="12" fill="#a3ada6">70%</text>
+<text x="40" y="653" font-size="13" fill="#6d7a73">Estimaciones del autor con respuestas reales, no un benchmark formal. Gemini gratis: Google puede usar lo que envías para mejorar sus productos.</text>
+</svg>
