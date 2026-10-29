@@ -449,7 +449,10 @@ def upload_document(slug: str, name: str, data: bytes, profile: bool = True) -> 
     m = store.mentor(slug)
     if not m:
         raise ValueError(tr("That mentor does not exist.", "Ese referente no existe."))
-    name = re.sub(r"[^\w .()-]", "_", name)[:120] or "document"
+    name = re.sub(r"[^\w .()-]", "_", name)
+    stem, ext = os.path.splitext(name)
+    name = (stem[:120 - len(ext)] + ext) if ext else name[:120]          # a long title keeps its .pdf
+    name = name if stem else "document" + ext
     d = store.corpus() / slug
     store.raw_dir(d).mkdir(parents=True, exist_ok=True)
     sid = texts.document_id("file:" + hashlib.sha1(data).hexdigest())     # the same file twice = one

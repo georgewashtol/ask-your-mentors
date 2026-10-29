@@ -27,6 +27,21 @@ import clean  # noqa: E402
 import search  # noqa: E402
 
 
+def tiny_pdf(text: str) -> bytes:
+    """A one-page PDF with real text, so the PDF reader has something to extract."""
+    stream = f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET"
+    objs = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+            f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream", "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    out, offsets = "%PDF-1.4\n", []
+    for i, o in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n{o}\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n" + "".join(f"{o:010d} 00000 n \n" for o in offsets)
+    return (out + f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n").encode()
+
+
 def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -200,6 +215,15 @@ class Server(unittest.TestCase):
         self.assertTrue(h["Content-Disposition"].startswith("attachment"))
         with self.assertRaises(urllib.error.HTTPError):
             self.request("/api/mentors/document?slug=viktor-frankl&id=doc-nope")
+        # a long PDF name keeps its .pdf, and a PDF is served as a PDF even if an older version cut its name
+        long = "A" * 200 + ".pdf"
+        pdf = "data:application/pdf;base64," + base64.b64encode(tiny_pdf("Meaning is found in responsibility.")).decode()
+        self.post("/api/mentors/file", {"slug": "viktor-frankl", "name": long, "data": pdf, "profile": False})
+        m = next(x for x in self.get("/api/mentors")["mentors"] if x["slug"] == "viktor-frankl")
+        f = m["sources"][-1]
+        self.assertTrue(f["name"].endswith(".pdf") and len(f["name"]) == 120, f["name"])
+        st, h, _ = self.request(f"/api/mentors/document?slug=viktor-frankl&id={f['id']}")
+        self.assertEqual(h["Content-Type"], "application/pdf")
         import advisor
         with patch.object(advisor.store, "list_mentors", return_value=[{"name": "Viktor Frankl", "slug": "viktor-frankl"}]):
             self.assertIn("ONLY: Viktor Frankl (viktor-frankl)", advisor.roster())

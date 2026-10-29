@@ -246,8 +246,9 @@ class Handler(BaseHTTPRequestHandler):
             path = next(iter(sorted(folder.glob(f"{sid}-*"))), None)
         if not path or not path.is_file():
             return self.send_error(404)
-        pdf = path.suffix.lower() == ".pdf"
         body = path.read_bytes()
+        pdf = body[:1024].lstrip().startswith(b"%PDF")     # by content: names cut by older versions lost their .pdf
+        name = src["name"] + (".pdf" if pdf and not src["name"].lower().endswith(".pdf") else "")
         self.send_response(200)
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
@@ -255,7 +256,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Security-Policy", store.hook("csp", "frame-ancestors 'self'", default="frame-ancestors 'self'"))
         self.send_header("Content-Type", "application/pdf" if pdf else "text/plain; charset=utf-8")
         self.send_header("Content-Disposition", ("attachment" if download else "inline") +
-                         "; filename*=UTF-8''" + quote(src["name"]))
+                         "; filename*=UTF-8''" + quote(name))
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
