@@ -853,6 +853,9 @@ def write_profile(slug: str, log: Log) -> str:
     if r["error"]:
         raise RuntimeError(r["error"])
     text = r["text"].strip()
+    if not text.startswith(("**Who they are", "**Quién es")):
+        # the AI answered something else (a question, a refusal): saving it would show it as the profile
+        raise RuntimeError(tr("The AI did not return a profile: {t}", "La IA no devolvió un perfil: {t}", t=text[:300]))
     when = m["when_to_ask"]
     found = re.search(r"\*\*(?:When to ask|Cu[aá]ndo consultarlo)\.?\*\*:?\s*(.+)", text)
     if found and not when:

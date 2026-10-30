@@ -500,6 +500,20 @@ class Seed(unittest.TestCase):
 
 
 class Profiles(unittest.TestCase):
+    def test_a_reply_that_is_not_a_profile_is_not_saved(self):
+        import advisor
+        import ingest
+        saved = {}
+        with patch.object(ingest.store, "mentor", return_value={"slug": "m", "name": "M", "when_to_ask": ""}), \
+                patch.object(ingest.store, "config", return_value={"ai": {"provider": "claude"}}), \
+                patch.object(ingest.search, "mentor_status", return_value={"with_text": 2}), \
+                patch.object(ingest.store, "corpus", return_value=Path(".")), \
+                patch.object(ingest.store, "update_fields", side_effect=lambda slug, **f: saved.update(f)), patch.object(ingest, "_set"), \
+                patch.object(advisor, "ask_profile", return_value={"text": "I cannot write it, which option do you prefer?", "error": ""}):
+            with self.assertRaises(RuntimeError):
+                ingest.write_profile("m", ingest.Log(0))
+        self.assertEqual(saved, {})
+
     def test_only_the_missing_profile_is_written(self):
         import ingest
         self.assertTrue(ingest.missing_profile(""))
