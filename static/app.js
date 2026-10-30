@@ -58,8 +58,14 @@ function applyBrand() {
 }
 // The AI switch: off = base mode (the mentors' exact words, no AI); on = the chosen AI, Claude Code by default.
 const aiOn = () => STATUS.ai_enabled !== false && STATUS.provider !== 'none';
+// Without the AI nobody can pick for you: "AI picks" becomes '' (no one chosen yet) until the user chooses on purpose
+function fitMode() {
+  if (!aiOn() && MODE === 'auto') MODE = '';
+  else if (aiOn() && !MODE) MODE = 'auto';
+}
 function paintAI() {
   const on = aiOn(), sw = $('#ai-switch'), d = $('#ai-detail');
+  fitMode();
   sw.setAttribute('aria-checked', String(on));
   const name = STATUS.provider_name || 'Claude Code', short = STATUS.provider === 'claude' ? 'Claude' : name;
   const [cls, text, help] = !on ? ['', L('Off · base mode', 'Apagada · modo base'), L('Answers with the mentors\' exact words and the minute. Turn it on for written answers.', 'Responde con las palabras exactas de los referentes y el minuto. Enciéndela para respuestas redactadas.')]
@@ -74,21 +80,26 @@ $('#ai-switch').addEventListener('click', async () => {
   $('#ai-switch').setAttribute('aria-checked', String(on));
   try {
     STATUS = { ...STATUS, ...(await api('/api/settings', { ai_enabled: on })) };
-    applyBrand(); if (!CHAT) paintEmpty();
+    applyBrand(); paintChips(); if (!CHAT) paintEmpty();
     if (on && STATUS.ai_status !== 'connected') openConnect();
   } catch (e) { alert(e.message); paintAI(); }
 });
 $('#ai-detail').addEventListener('click', () => { if (aiOn()) openConnect(); });
 
 // Second brain: off by default. On = the AI may READ the user's notes folder to personalize the answers.
+// Only the AI uses it, so with the AI off the switch is locked (the saved choice comes back when the AI is turned on).
 function paintBrain() {
-  const b = STATUS.brain || {}, on = !!b.enabled, d = $('#brain-detail');
-  $('#brain-switch').setAttribute('aria-checked', String(on));
+  const b = STATUS.brain || {}, ai = aiOn(), on = !!b.enabled, d = $('#brain-detail'), sw = $('#brain-switch');
+  sw.setAttribute('aria-checked', String(on && ai));
+  sw.disabled = !ai;
+  sw.title = ai ? L('Let the AI read your own notes to personalize the answers', 'Dejar que la IA lea tus propias notas para personalizar las respuestas')
+    : L('Turn the AI on first: the second brain is used by the AI.', 'Enciende primero la IA: el segundo cerebro lo usa la IA.');
   const short = (b.path || '').split(/[\\/]/).filter(Boolean).pop() || '';      // only the folder name; the full path is in the tooltip
-  d.className = 'link-btn ' + (on && aiOn() ? 'ok' : '');
-  d.textContent = !on ? L('Off · not connected', 'Apagado · sin conectar')
-    : aiOn() ? `${L('On', 'Encendido')} · ${short}` : L('On · needs the AI on', 'Encendido · necesita la IA encendida');
-  d.title = on ? L(`The AI reads only what it needs from ${b.path}, read-only. Click to change the folder.`, `La IA lee solo lo que necesita de ${b.path}, sin modificar nada. Haz clic para cambiar la carpeta.`)
+  d.className = 'link-btn ' + (on && ai ? 'ok' : '');
+  d.disabled = !ai;
+  d.textContent = !ai ? L('Off · needs the AI on', 'Apagado · necesita la IA encendida')
+    : !on ? L('Off · not connected', 'Apagado · sin conectar') : `${L('On', 'Encendido')} · ${short}`;
+  d.title = !ai ? sw.title : on ? L(`The AI reads only what it needs from ${b.path}, read-only. Click to change the folder.`, `La IA lee solo lo que necesita de ${b.path}, sin modificar nada. Haz clic para cambiar la carpeta.`)
     : L('Turn it on to connect your notes, or create a second brain from scratch.', 'Enciéndelo para conectar tus notas o crear un segundo cerebro desde cero.');
 }
 async function askBrainPath() {
@@ -128,12 +139,13 @@ $('#brain-create').addEventListener('click', () => brainAction('/api/brain/creat
 $('#brain-type').addEventListener('click', typeBrainPath);
 $('#close-brain').addEventListener('click', () => $('#dlg-brain').close());
 $('#brain-switch').addEventListener('click', async () => {
+  if (!aiOn()) return;
   const b = STATUS.brain || {}, on = !b.enabled;
   if (on && !b.path) return openBrain();                 // first time: choose or create the folder
   try { STATUS = { ...STATUS, ...(await api('/api/settings', { brain_enabled: on })) }; paintBrain(); }
   catch (e) { alert(e.message); }
 });
-$('#brain-detail').addEventListener('click', openBrain);
+$('#brain-detail').addEventListener('click', () => { if (aiOn()) openBrain(); });
 
 function connectButton(text = L('Connect Claude', 'Conectar Claude')) { return `<button type="button" class="small primary open-connect">${text}</button>`; }
 document.addEventListener('click', ev => { if (ev.target.closest('.open-connect')) openConnect(); });
@@ -210,14 +222,14 @@ async function loadStatus() {
     setLanguage(STATUS.language); location.reload(); return new Promise(() => {});
   }
   if (!INITIAL_MODE_SET && STATUS.initial_mode) { MODE = STATUS.initial_mode; INITIAL_MODE_SET = true; }
-  applyBrand();
+  applyBrand();     // also fits the mode to the AI switch
 }
 async function loadMentors() {
   const d = await api('/api/mentors');
   MENTORS = d.mentors; MODES = d.modes; GROUPS = d.groups || [];
   $('#n-mentors').textContent = MENTORS.length ? `${L('My mentors', 'Mis referentes')} · ${MENTORS.length}` : L('My mentors', 'Mis referentes');
-  if (MODE !== 'auto' && MODE !== 'all' && !slugsOf(MODE) && !MENTORS.find(r => r.slug === MODE)) MODE = 'auto';
-  paintChips();
+  if (MODE && MODE !== 'auto' && MODE !== 'all' && !slugsOf(MODE) && !MENTORS.find(r => r.slug === MODE)) MODE = 'auto';
+  fitMode(); paintChips();
 }
 
 // ---------------------------------------------------------------- views
@@ -336,13 +348,13 @@ function paintSelector() {
     applyPick(); paintSelector();
   }));
   const n = PICKED.size, one = n === 1 ? MENTORS.find(r => PICKED.has(r.slug)) : null;
-  $('#sel-count').textContent = !n ? L('No one checked: the AI picks', 'Nadie marcado: la IA elige')
+  $('#sel-count').textContent = !n ? (aiOn() ? L('No one checked: the AI picks', 'Nadie marcado: la IA elige') : L('No one checked: pick at least one', 'Nadie marcado: elige al menos uno'))
     : one ? L(`${one.name} answers`, `Responde ${one.name}`) : L(`${n} checked: they answer together`, `${n} marcados: responden juntos`);
 }
 let PICKED = new Set();
-// Saved on every check: none = the AI picks, one = that mentor, several = they answer together
+// Saved on every check: none = the AI picks (without the AI: no one yet), one = that mentor, several = they answer together
 function applyPick() {
-  MODE = !PICKED.size ? 'auto' : PICKED.size === 1 ? [...PICKED][0] : 'multi:' + [...PICKED].join(',');
+  MODE = !PICKED.size ? (aiOn() ? 'auto' : '') : PICKED.size === 1 ? [...PICKED][0] : 'multi:' + [...PICKED].join(',');
   paintChips(); if (!CHAT) paintEmpty();
 }
 $('#sel-filter').addEventListener('input', paintSelector);
@@ -380,7 +392,8 @@ function hoursText(h) {
 function paintChips() {
   const hints = { auto: L('The AI decides which 2 or 3 mentors have something real to say.', 'La IA decide qué 2 o 3 referentes tienen algo real que decir.'),
     all: L('Everyone with material on the topic: summary, each voice and where they disagree.', 'Todos los que tengan material sobre el tema: resumen, cada voz y en qué chocan.') };
-  const chip = c => `<button type="button" class="chip ${c.k === MODE ? 'active' : ''}" data-mode="${esc(c.k)}" title="${esc(c.t)}">${c.v}</button>`;
+  const locked = k => k === 'auto' && !aiOn();         // without the AI nobody can pick for you
+  const chip = c => `<button type="button" class="chip ${c.k === MODE ? 'active' : ''}" data-mode="${esc(c.k)}" title="${esc(locked(c.k) ? L('Needs the AI on. Without it, choose Everyone or pick mentors.', 'Necesita la IA encendida. Sin ella, elige Todos o elige referentes.') : c.t)}" ${locked(c.k) ? 'disabled' : ''}>${c.v}</button>`;
   const add = `<button type="button" class="chip add" id="chip-add" title="${L('Add a mentor', 'Agregar un referente')}">${L('+ Add', '+ Agregar')}</button>`;
   $('#question-form').hidden = !MENTORS.length;
   $('.fine-print').hidden = !MENTORS.length;
@@ -394,6 +407,7 @@ function paintChips() {
   $('#open-selector').addEventListener('click', ev => { ev.stopPropagation(); toggleSelector(); });
   $$('#chips .chip[data-mode]').forEach(b => b.addEventListener('click', () => { MODE = b.dataset.mode; paintChips(); if (!CHAT) paintEmpty(); }));
   $('#chip-add').addEventListener('click', () => openAdd());
+  composerState();
 }
 
 // ---------------------------------------------------------------- empty chat screen
@@ -414,7 +428,8 @@ function paintEmpty() {
   }
   const loading = MENTORS.filter(r => r.job && ['queued', 'running'].includes(r.job.status));
   const name = esc(modeName(MODE));
-  const who = MODE === 'auto' ? L('The AI picks who has something real to say.', 'La IA elige quién tiene algo real que decir.')
+  const who = !MODE ? L('Choose who answers: Everyone, or one or more mentors. With the AI off, nobody picks for you.', 'Elige quién responde: Todos, o uno o varios referentes. Con la IA apagada nadie elige por ti.')
+    : MODE === 'auto' ? L('The AI picks who has something real to say.', 'La IA elige quién tiene algo real que decir.')
     : MODE === 'all' ? L('Everyone who has talked about the topic answers.', 'Responden todos los que hayan hablado del tema.')
     : slugsOf(MODE) ? L(`${name} answer, each in their own voice, and where they disagree.`, `Responden ${name}, cada uno en su voz, y dónde chocan.`)
     : L(`${name} answers, in their own voice.`, `Responde ${name}, en su voz.`);
@@ -614,7 +629,7 @@ function paintMessages(messages) {
 async function openChat(id) {
   CHAT = id;
   const { chat, messages } = await api(`/api/chat?id=${id}`);
-  MODE = chat.mode; paintChips(); paintMessages(messages);
+  MODE = chat.mode; fitMode(); paintChips(); paintMessages(messages);
   const pend = messages.find(m => m.status === 'pending');
   if (!chat.is_read && !pend) await api('/api/chat/read', { id, read: true }).catch(() => {});
   loadChats();
@@ -626,7 +641,9 @@ const QUEUE = {};
 function composerState() {
   $('#stop').hidden = !PENDING;
   $('#send').textContent = PENDING ? L('Queue it', 'Poner en cola') : L('Send', 'Enviar');
-  $('#send').title = PENDING ? L('Sent by itself when the previous answer finishes', 'Se envía sola cuando termine la respuesta anterior') : '';
+  $('#send').title = PENDING ? L('Sent by itself when the previous answer finishes', 'Se envía sola cuando termine la respuesta anterior')
+    : !MODE ? L('First choose who answers', 'Primero elige quién responde') : '';
+  $('#send').classList.toggle('waiting', !MODE);
 }
 function poll(mid) {
   clearInterval(POLL);
@@ -656,6 +673,7 @@ async function ask() {
   const question = $('#question').value.trim();
   if (!question) return;
   if (!MENTORS.length) { $('#thread .s-query') && $('#thread .s-query').focus(); return; }
+  if (!MODE) { $('#chips').classList.remove('nudge'); void $('#chips').offsetWidth; $('#chips').classList.add('nudge'); return; }   // the question stays; first choose who answers
   $('#question').value = ''; fitComposer();
   if (PENDING && CHAT) {                                    // an answer is on its way: to the queue
     (QUEUE[CHAT] = QUEUE[CHAT] || []).push({ question, mode: MODE });
@@ -670,7 +688,7 @@ $('#stop').addEventListener('click', async () => {
   $('#stop').disabled = false;
 });
 // A new conversation always starts from the default (the AI picks), not from the mentors of the chat that was open
-function newChat(mode) { CHAT = 0; PENDING = 0; MODE = mode || STATUS.initial_mode || 'auto'; PICKED = new Set(); clearInterval(POLL); composerState(); paintChips(); paintMessages([]); loadChats(); }
+function newChat(mode) { CHAT = 0; PENDING = 0; MODE = mode || STATUS.initial_mode || 'auto'; fitMode(); PICKED = new Set(); clearInterval(POLL); composerState(); paintChips(); paintMessages([]); loadChats(); }
 function fitComposer() { const t = $('#question'); t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; }
 $('#question').addEventListener('input', fitComposer);
 $('#question-form').addEventListener('submit', ev => { ev.preventDefault(); ask(); });
