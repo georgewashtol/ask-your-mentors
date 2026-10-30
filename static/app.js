@@ -1101,10 +1101,10 @@ async function mentorAction(act, slug, id) {
     if (act === 'remove-source') {
       const f = r.sources.find(x => (x.type === 'file' ? x.id : x.url) === id); if (!f) return;
       const what = f.type === 'file' || f.type === 'web' ? L('its text', 'su texto') : L('the videos or episodes it brought', 'los videos o episodios que trajo');
-      if (!confirm(L(`Remove «${f.name || f.url}» from ${r.name}'s sources? The AI stops using it and ${what} is deleted. This cannot be undone.`,
-        `¿Quitar «${f.name || f.url}» de las fuentes de ${r.name}? La IA deja de usarla y se borra ${what}. No se puede deshacer.`))) return;
+      if (!confirm(L(`Remove «${f.name || f.url}» from ${r.name}'s sources? The AI stops using it, ${what} is deleted and their profile is written again from what is left. This cannot be undone.`,
+        `¿Quitar «${f.name || f.url}» de las fuentes de ${r.name}? La IA deja de usarla, se borra ${what} y su perfil se vuelve a escribir con lo que queda. No se puede deshacer.`))) return;
       const res = await api('/api/mentors/source/remove', { slug, key: id });
-      await loadMentors(); paintMentors();
+      await loadMentors(); paintMentors(); refreshJobs(true);
       if (res.kept) alert(res.note);
       return;
     }

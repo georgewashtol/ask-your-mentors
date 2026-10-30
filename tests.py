@@ -230,8 +230,11 @@ class Server(unittest.TestCase):
         # a wrong document can be taken out: it leaves the sources and its text and file are deleted
         d = self.data / "corpus" / "viktor-frankl"
         self.assertTrue((d / "text" / f"{sid}.txt").exists())
+        profiles = lambda: sum(1 for j in self.get("/api/jobs?n=200")["jobs"] if j["slug"] == "viktor-frankl" and j["kind"] == "profile")
+        before = profiles()
         r = self.post("/api/mentors/source/remove", {"slug": "viktor-frankl", "key": sid})
         self.assertEqual((r["removed"], r["kept"]), (1, False))
+        self.assertEqual(profiles(), before + 1)              # the profile is written again from what is left
         m = next(x for x in self.get("/api/mentors")["mentors"] if x["slug"] == "viktor-frankl")
         self.assertNotIn("one.txt", [s["name"] for s in m["sources"]])
         self.assertFalse((d / "text" / f"{sid}.txt").exists())
@@ -546,11 +549,17 @@ class Units(unittest.TestCase):
             conn = lambda: sqlite3.connect(":memory:", isolation_level=None)
             def fake_db():
                 c = conn(); c.execute("CREATE TABLE jobs(id, slug, kind, status)"); return c
+            import fulltext
+            cleared = {}
             with patch.object(ingest.store, "mentor", return_value={"slug": "m", "sources": [yt, pod]}), \
                     patch.object(ingest.store, "corpus", return_value=Path(tmp)), patch.object(ingest.store, "db", fake_db), \
-                    patch.object(ingest.store, "save_mentor", side_effect=lambda m, new: saved.update(m)):
+                    patch.object(ingest.store, "save_mentor", side_effect=lambda m, new: saved.update(m)), \
+                    patch.object(fulltext, "sync"), patch.object(ingest, "_profile_if_missing") as rewrite, patch.object(ingest, "_cancel_profile"), \
+                    patch.object(ingest.store, "update_fields", side_effect=lambda slug, **f: cleared.update(f)):
                 r = ingest.remove_source("m", yt["url"])
             self.assertEqual((r["removed"], r["kept"], saved["sources"]), (1, False, [pod]))
+            self.assertEqual(cleared, {"profile": "", "when_to_ask": ""})     # the old profile spoke of the channel
+            rewrite.assert_called_once_with("m")
             self.assertEqual(sorted(p.name for p in (d / "text").iterdir()),
                              ["20260101 - Title [rss-1234567890].txt", "doc-aaaaaaaaaaaa.txt"])
             self.assertEqual(sorted(p.name for p in (d / "raw").iterdir()), ["20260101 - Title [rss-1234567890].es.vtt"])

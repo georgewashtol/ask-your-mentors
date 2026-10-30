@@ -503,6 +503,13 @@ def remove_source(slug: str, key: str) -> dict:
     ids.discard(None)
     removed = _delete_items(d, ids) if ids else 0
     store.save_mentor({**m, "sources": rest}, new=False)
+    if removed:
+        # the profile described the material that is gone: it is cleared and the AI writes it again from what is left
+        import fulltext
+        fulltext.sync()                          # first, so the new profile does not read the deleted text
+        _cancel_profile(slug)                    # one being written now would bring back the old material
+        store.update_fields(slug, profile="", when_to_ask="")
+        _profile_if_missing(slug)
     if kept:
         note = tr("Source removed. Its material stays: it shares it with the other {k} sources.",
                   "Fuente quitada. Su material se queda: lo comparte con las otras fuentes de {k}.",
@@ -510,6 +517,20 @@ def remove_source(slug: str, key: str) -> dict:
     else:
         note = tr("Source removed with its material ({n}).", "Fuente quitada con su material ({n}).", n=removed)
     return {"ok": True, "note": note, "removed": removed, "kept": kept}
+
+
+def _cancel_profile(slug: str) -> None:
+    conn = store.db()
+    try:
+        ids = [r["id"] for r in conn.execute("SELECT id FROM jobs WHERE slug=? AND kind='profile' AND status IN ('queued','running')",
+                                             (slug,))]
+    finally:
+        conn.close()
+    for jid in ids:
+        cancel(jid)
+    deadline = time.time() + 5
+    while _current.get("id") in ids and time.time() < deadline:
+        time.sleep(0.1)
 
 
 def _delete_items(d: Path, ids: set) -> int:
