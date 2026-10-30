@@ -45,6 +45,7 @@ Tests: `python3 tests.py` (starts the server on a free port with temporary data 
 | Add a source to a mentor | The "Add link" button, or `POST /api/mentors/source {"slug": ..., "url": ...}`. By hand: the `sources` column (JSON `[{"type":"youtube"|"rss"|"web"|"file","url":...,"name":...}]`) of the `mentors` table in `data/mentors.db`, or `store.save_mentor(...)` with `new=False`, then `POST /api/mentors/download {"slug": ..., "limit": 0}`. |
 | Change a profile or "when to ask" | Columns `profile` and `when_to_ask` of `mentors` (or `store.update_fields`). |
 | Change the answer format or length | `protocol()` in `store.py` (what Claude Code and Codex read) and `_base_instruction()` / `mode_instruction()` in `advisor.py` (answers are kept to about 450 words). Keep `language_rule()`: it is what keeps the answer in the app's language. |
+| Better base mode (no AI) for their topics | Add words or concepts to `CONCEPTS` in `lexicon.py` (one line per concept: `name: spanish words | english words`); a new kind of question goes in `INTENTS`. Weights live in `query.score()`. Run `python3 tests.py`. |
 | Faster AI answers | Agents get a head start: the best fragments from the index go in the prompt (`head_start()` in `advisor.py`; off with `"head_start": false`). A faster model: `ai.claude_model` = `sonnet`. |
 | Change how mentors are looked up online | `PROMPT` and `SCHEMA` in `identify.py`. |
 | Move the corpus to another folder | `data/config.json` → `corpus` (absolute or relative path). |
@@ -104,7 +105,9 @@ The app's code knows nothing about the extension: that is how a personal instanc
 | `clean.py` | VTT/SRT to text with `[mm:ss]` |
 | `thumbnails.py` | Channel picture (og:image), podcast cover (itunes:image) and the page to open them; saved in `data/thumbs/` because the CSP does not allow images from other domains |
 | `brain.py` | Second brain: validates the notes folder, adds it read-only for the agent, instruction to personalize; excerpts for AIs without tools |
-| `fulltext.py` | Search index (SQLite FTS5, BM25) in `data/search.db`, rebuilt on its own |
+| `fulltext.py` | Search index (SQLite FTS5, BM25) in `data/search.db`, rebuilt on its own; retrieval and corpus statistics (fts5vocab) for `query.py` |
+| `query.py` | Search without AI: question analysis (intent, stems, bilingual expansion, cognates, typos, IDF), ranking (coverage, proximity, order, intent, title, pseudo-relevance feedback, sponsor and filler penalties, no repeats) and the quoted window in bold |
+| `lexicon.py` | Bilingual concepts (`CONCEPTS`) and question intents (`INTENTS`); plain data |
 | `doctor.py` | Requirements check (`app.py --check`): system, RAM, disk, yt-dlp, Claude, ffmpeg, whisper, pdftotext |
 | `static/` | Interface (no build, no CDN, no inline scripts) |
 

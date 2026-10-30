@@ -65,6 +65,8 @@ Needs Python 3.9+ (no `pip install`) and `yt-dlp` for YouTube. The AI is optiona
 
 The author's estimates after real answers, not a formal benchmark.
 
+**How base mode finds the answer without AI** (`query.py`, standard library, about 0.1 to 0.5 s over 200,000 paragraphs): it reads what kind of answer you want (a price, steps, a reason, a time, advice), reduces each word to its stem in Spanish and English, adds its translations and synonyms from a bilingual lexicon you can extend (`lexicon.py`) and its look-alikes the corpus really says (agency → agencia), corrects typos against the corpus vocabulary, weighs rare words more (BM25 IDF), and ranks each paragraph by how much of the question it covers, how close together the words are, word order, figures for "how much", the title and pseudo-relevance feedback. Sponsor reads and "subscribe" filler sink, repeats are skipped, and the quote shows the matched words in bold plus a *Searched:* line with what it looked for.
+
 **Gemini for free:** get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) with any Google account (no card), then in the app turn the **AI** switch on, choose **Gemini · free** and paste it. On the free plan Google may use what you send to improve its products and people may review it: do not use it with sensitive information.
 
 <details>
@@ -119,6 +121,8 @@ store.py       settings, SQLite, mentors, corpus protocol, migrations
 ingest.py      background queue: yt-dlp, RSS, whisper, documents, profiles
 identify.py    finds a person's official channels and podcast
 fulltext.py    search index (SQLite FTS5): answers in milliseconds
+query.py       understands the question and ranks paragraphs (base mode and the AI's head start)
+lexicon.py     bilingual concepts and question intents the search uses (add your own words)
 search.py      corpus search (CLI the agent uses + chat functions)
 brain.py       second brain: read-only access, folder picker, create from a template
 templates/     the starter second brain (English and Spanish)

@@ -734,6 +734,57 @@ class Units(unittest.TestCase):
         self.assertEqual(search.keywords("¿Qué diría sobre el miedo a cobrar?"), ["miedo", "cobrar"])
         self.assertEqual(search.keywords("What would they say about the fear of charging?"), ["fear", "charging"])
 
+    def test_query_understanding(self):
+        import query
+        self.assertEqual((query.stem("charging"), query.stem("ventas"), query.stem("disciplina")), ("charg", "vent", "disciplin"))
+        q = query.analyze("How much should I sell my coaching for 6 months?")
+        self.assertEqual(q["lang"], "en")
+        self.assertEqual([s["label"] for s in q["slots"]], ["sell", "coaching", "months", "price"])
+        self.assertTrue(q["slots"][-1]["intent"])                        # "how much" asks for a price
+        self.assertTrue(q["slots"][0]["rx_more"].search("hay que vender"))    # English question, Spanish words
+        self.assertTrue(q["number_rx"].search("seis meses"))
+        q = query.analyze("¿Cuánto debería cobrar?")                         # the intent joins the word's slot
+        self.assertEqual(([s["label"] for s in q["slots"]], q["intents"][0]["name"]), (["cobrar"], "price"))
+        self.assertEqual([s["label"] for s in query.analyze("what is deep work")["slots"]], ["deep work"])
+        self.assertIn("**vender**", query.best_window("lo que yo haria es vender primero", query.analyze("sell")))
+        ad = "Go to shopify.com/deep to sell more, sign up for a free trial and sell everywhere today with us"
+        real = "If you want to sell more you have to learn how to sell and talk to the people who buy from you"
+        self.assertGreater(query.score(query.analyze("how to sell"), real), query.score(query.analyze("how to sell"), ad))
+
+    def test_base_search_ranking(self):
+        import store, fulltext, advisor
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / "corpus" / "ana" / "text").mkdir(parents=True)
+            (d / "config.json").write_text(json.dumps({"corpus": str(d / "corpus"), "initial_mentors": []}), encoding="utf-8")
+            (d / "corpus" / "ana" / "text" / "a.txt").write_text(
+                "# Negocio\nmentor: Ana\nurl: https://www.youtube.com/watch?v=abcdefghijk\nid: a\n---\n\n"
+                "[00:10] El coaching es lo que mas me gusta hacer con mis alumnos cada semana del ano entero.\n\n"
+                "[01:00] Mi programa de coaching de seis meses lo vendo por 1900 euros y cada seis meses sube de precio.\n\n"
+                "[02:00] La disciplina se construye cada manana cuando no tienes ganas de levantarte temprano.\n\n"
+                "[03:00] Hoy quiero hablar de vender: go to shopify.com/coaching and sign up for a free trial to sell.\n",
+                encoding="utf-8")
+            try:
+                store.start(str(d))
+                store.save_mentor({"name": "Ana", "sources": []}, new=True)
+                fulltext.sync()
+                hit = fulltext.relevant("How much should I sell my coaching for 6 months?", None, 5)
+                self.assertEqual(hit[0]["minute"], "01:00")
+                self.assertNotIn("03:00", [h["minute"] for h in hit[:2]])          # the sponsor read sinks
+                (d / "corpus" / "ana" / "text" / "b.txt").write_text(            # a typo is corrected to a word said 3+ times
+                    "# Habitos\nmentor: Ana\nurl: https://example.com/b\nid: b\n---\n\n[00:01] Disciplina diaria.\n\n"
+                    "[00:02] Sin disciplina no hay nada que hacer en la vida de nadie.\n", encoding="utf-8")
+                fulltext.sync()
+                self.assertEqual(fulltext.analyzed("dicsiplina")["fixed"], {"dicsiplina": "disciplina"})
+                self.assertIn("disciplina", fulltext.relevant("dicsiplina", None, 5)[0]["text"].lower())
+                text = advisor.no_ai_answer("How much should I sell my coaching for 6 months?", "auto")
+                self.assertIn("**coaching**", text)
+                self.assertIn("1900 euros", text)
+                files = search.relevant("How much should I sell my coaching for 6 months?", d / "corpus", None, 5)
+                self.assertEqual(files[0]["minute"], "01:00")                     # same ranking without the index
+            finally:
+                os.environ.pop("MENTORS_CONFIG", None)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

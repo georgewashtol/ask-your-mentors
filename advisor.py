@@ -211,21 +211,26 @@ def _fragments(question: str, slugs, max_fragments: int, per_source: int, size: 
 
 
 def _best_window(text: str, question: str, words: int = 60) -> str:
-    """The stretch of a paragraph that holds the most words of the question. Auto subtitles have no periods,
-    so it works by words, not sentences."""
-    w = text.split()
-    if len(w) <= words:
-        return text.strip()
-    stems = [search.plain(k)[:5] for k in search.keywords(question)]
-    hits = [1 if any(search.plain(x).startswith(s) for s in stems) else 0 for x in w]
-    best, start, run = -1, 0, sum(hits[:words])
-    for i in range(len(w) - words + 1):
-        if i:
-            run += hits[i + words - 1] - hits[i - 1]
-        if run > best:
-            best, start = run, i
-    piece = " ".join(w[start:start + words])
-    return ("..." if start else "") + piece + ("..." if start + words < len(w) else "")
+    """The stretch of a paragraph that holds most of the question, with the matched words in bold (query.py)."""
+    import fulltext
+    import query
+    return query.best_window(text, fulltext.analyzed(question), words)
+
+
+def _mentor_fit(question: str) -> dict:
+    """How well each mentor's "when to ask" and profile match the question (0 to 1): in "AI picks" and "Everyone"
+    it breaks ties toward the mentor who actually teaches the topic, without AI."""
+    import fulltext
+    import query
+    q = fulltext.analyzed(question)
+    if not q["slots"]:
+        return {}
+    out = {}
+    for m in store.list_mentors():
+        norm = search.plain(f"{m.get('when_to_ask') or ''} {(m.get('profile') or '')[:3000]}")
+        weights, _ = query.matches(q, norm)
+        out[m["slug"]] = sum(s["idf"] * w for s, w in zip(q["slots"], weights)) / q["idf_total"]
+    return out
 
 
 def _cite(f: dict) -> str:
@@ -236,24 +241,34 @@ def _cite(f: dict) -> str:
 def no_ai_answer(question: str, mode: str, history: list | None = None, note: str = "") -> str:
     """Base mode: no AI writes anything. Each mentor answers with their own words (the best stretch of what they
     said on the topic) and the exact minute. Fast, free and 100% faithful; it does not reason or summarize."""
+    import fulltext
+    import query as understand
     query = question
-    if history and len(search.keywords(question)) < 2:         # a short follow-up ("and why?") borrows the last topic
+    if history and len([s for s in fulltext.analyzed(question)["slots"] if not s["intent"]]) < 2:
+        # a short follow-up ("and why?") keeps its intent and borrows the topic of the last question
         last = next((m["text"] for m in reversed(history) if m["role"] == "user"), "")
         query = f"{question} {last}"
     slugs = mode_slugs(mode)
     frags = _fragments(query, slugs, max_fragments=40, per_source=2, size=4000)
+    q = fulltext.analyzed(query)
     intro = tr("**Base mode** · their exact words, with the minute. No AI wrote this: every quote was said by them.",
                "**Modo base** · sus palabras exactas, con el minuto. Ninguna IA escribió esto: cada cita la dijeron ellos.")
     parts = ([note, ""] if note else []) + [intro, ""]
+    searched = understand.describe(q)
+    if searched:
+        parts += [tr("*Searched:* {s}", "*Búsqueda:* {s}", s=searched), ""]
+    if q["fixed"]:
+        parts += [tr("*Corrected:* {c}", "*Corregido:* {c}", c=", ".join(f"{a} → {b}" for a, b in q["fixed"].items())), ""]
     if not frags:
-        keys = ", ".join(search.keywords(query)) or "-"
+        keys = ", ".join(q["missing"] + [s["label"] for s in q["slots"]]) or "-"
         parts.append(tr("None of your mentors talks about that with these words: {k}. Try other words or a synonym.",
                         "Ninguno de tus referentes habla de eso con estas palabras: {k}. Prueba con otras palabras o un sinónimo.", k=keys))
         return "\n".join(parts)
     by_mentor: dict = {}
     for f in frags:
         by_mentor.setdefault(f["mentor"], []).append(f)
-    ranked = sorted(by_mentor, key=lambda m: -sum(x["score"] for x in by_mentor[m][:3]))
+    fit = _mentor_fit(query) if not slugs else {}
+    ranked = sorted(by_mentor, key=lambda m: -sum(x["score"] for x in by_mentor[m][:3]) * (1 + 0.5 * fit.get(m, 0)))
     limit = 1 if slugs and len(slugs) == 1 else len(slugs) if slugs else (6 if mode == "all" else 3)
     for slug in ranked[:limit]:
         items = by_mentor[slug]

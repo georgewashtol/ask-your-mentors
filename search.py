@@ -200,15 +200,13 @@ def keywords(question: str, limit: int = 8) -> list:
 
 
 def relevant(question, corpus, slugs=None, max_fragments=10, per_source=3, size=520):
-    """Most relevant fragments for a question: each paragraph scores by distinct keywords.
-
-    Matches by stem (the first 5 letters) to tolerate plurals and verb forms.
-    """
-    keys = keywords(question)
-    if not keys:
+    """Most relevant fragments for a question, reading the files (while the full-text index is being built).
+    Same understanding and ranking as the index: query.analyze() and query.rank()."""
+    import query
+    q = query.analyze(question)
+    if not q["slots"]:
         return []
-    stems = [k[:5] if len(k) > 5 else k for k in keys]
-    patterns = [re.compile(r"\b" + re.escape(s)) for s in stems]
+    any_slot = re.compile("|".join(f"(?:{s[k].pattern})" for s in q["slots"] for k in ("rx_own", "rx_more") if s[k]))
     candidates = []
     for d in mentor_dirs(Path(corpus), set(slugs) if slugs else None):
         for file in text_files(d):
@@ -217,38 +215,21 @@ def relevant(question, corpus, slugs=None, max_fragments=10, per_source=3, size=
             except OSError:
                 continue
             head = meta(content)
-            title_n = plain(head.get("title", ""))
-            title_bonus = sum(1 for p in patterns if p.search(title_n)) * 0.5
             for paragraph in body_of(content).split("\n\n"):
                 paragraph = paragraph.strip()
-                if not paragraph:
+                if not paragraph or not any_slot.search(plain(paragraph)):
                     continue
-                norm = plain(paragraph)
-                distinct = sum(1 for p in patterns if p.search(norm))
-                if not distinct:
-                    continue
-                total = sum(len(p.findall(norm)) for p in patterns)
                 m = RE_MARK.match(paragraph)
                 mark = m.group(1) if m else None
-                text = paragraph[m.end():] if m else paragraph
-                if len(text) > size:
-                    text = text[:size].rsplit(" ", 1)[0] + "..."
-                candidates.append({
-                    "score": distinct * 3 + min(total, 6) * 0.3 + title_bonus,
-                    "mentor": d.name, "name": head.get("mentor", d.name),
-                    "title": head.get("title", file.stem), "id": head.get("id", ""),
-                    "minute": mark, "url": url_at(head.get("url", ""), mark), "text": text})
-    candidates.sort(key=lambda c: -c["score"])
-    chosen, per_id = [], {}
-    for c in candidates:
-        key = (c["mentor"], c["title"])
-        if per_id.get(key, 0) >= per_source:
-            continue
-        per_id[key] = per_id.get(key, 0) + 1
-        chosen.append(c)
-        if len(chosen) >= max_fragments:
-            break
-    return chosen
+                candidates.append({"mentor": d.name, "name": head.get("mentor", d.name),
+                                   "title": head.get("title", file.stem), "id": head.get("id", ""),
+                                   "minute": mark, "url": url_at(head.get("url", ""), mark),
+                                   "text": paragraph[m.end():] if m else paragraph})
+    if not candidates:
+        return []
+    vocab = query.FileVocab([c["text"] for c in candidates[:3000]])
+    q = query.analyze(question, vocab)          # IDF from the paragraphs that mention the question
+    return query.rank(q, candidates, max_fragments, per_source, size, vocab)
 
 
 # ---------------------------------------------------------------- corpus status

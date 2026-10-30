@@ -7,12 +7,14 @@ falls back to reading the files.
 """
 from __future__ import annotations
 
+import difflib
 import re
 import sqlite3
 import threading
 import time
 from pathlib import Path
 
+import query
 import search
 import store
 
@@ -112,6 +114,9 @@ def sync() -> int:
                 conn.commit()
         conn.commit()
         conn.close()
+        if changed:
+            _cache.clear()
+            _analyzed.clear()
         _state["ready"] = True
         _state["synced"] = time.time()
         return changed
@@ -123,60 +128,110 @@ def sync_in_background() -> None:
     threading.Thread(target=sync, daemon=True).start()
 
 
-def _query(keys: list) -> str:
-    """Each keyword as a prefix (its first 5 letters), so plurals and verb forms match: disciplina, disciplinado."""
-    terms = []
-    for k in keys:
-        stem = re.sub(r"[^\w]", "", search.plain(k))
-        stem = stem[:5] if len(stem) > 5 else stem
-        if len(stem) >= 3:
-            terms.append(f'"{stem}"*')
-    return " OR ".join(dict.fromkeys(terms))
+class _Vocab:
+    """Corpus statistics for query.analyze(): document frequency of a term and spelling corrections, read from
+    FTS5's own vocabulary (fts5vocab), in about a millisecond each. Cached until the index changes."""
+
+    def __init__(self, conn):
+        self.conn = conn
+        conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS temp.vocab USING fts5vocab(main, paragraphs, 'row')")
+
+    def total(self) -> int:
+        if "total" not in _cache:
+            _cache["total"] = self.conn.execute("SELECT max(rowid) FROM paragraphs").fetchone()[0] or 0
+        return _cache["total"]
+
+    def df(self, text: str, kind: str) -> int:
+        key = (text, kind)
+        if key not in _cache:
+            if kind == "p":
+                upper = text[:-1] + chr(ord(text[-1]) + 1)
+                row = self.conn.execute("SELECT sum(doc) FROM vocab WHERE term >= ? AND term < ?", (text, upper)).fetchone()
+            elif kind == "x":
+                row = self.conn.execute("SELECT doc FROM vocab WHERE term = ?", (text,)).fetchone()
+            else:                               # a phrase: as many documents as its rarest word, at most
+                row = (min((self.df(w, "x") for w in text.split()), default=0),)
+            _cache[key] = int(row[0] or 0) if row else 0
+        return _cache[key]
+
+    def forms(self, prefix: str) -> list:
+        """The words of the corpus that start with a prefix, with their document counts (at most 3,000)."""
+        key = ("forms", prefix)
+        if key not in _cache:
+            upper = prefix[:-1] + chr(ord(prefix[-1]) + 1)
+            _cache[key] = self.conn.execute("SELECT term, doc FROM vocab WHERE term >= ? AND term < ? LIMIT 3000",
+                                            (prefix, upper)).fetchall()
+        return _cache[key]
+
+    def similar(self, word: str) -> str:
+        """The closest word the corpus does say (same first letter, said at least 3 times), for typos."""
+        if len(word) < 5:
+            return ""
+        key = ("similar", word)
+        if key not in _cache:
+            rows = self.conn.execute("SELECT term FROM vocab WHERE term >= ? AND term < ? AND doc >= 3 "
+                                     "AND length(term) BETWEEN ? AND ?",
+                                     (word[0], chr(ord(word[0]) + 1), len(word) - 2, len(word) + 2)).fetchall()
+            found = difflib.get_close_matches(word, [r[0] for r in rows], n=1, cutoff=0.8)
+            _cache[key] = found[0] if found else ""
+        return _cache[key]
+
+
+_cache: dict = {}
+_analyzed: dict = {}
+
+
+def analyzed(question: str) -> dict:
+    """The question understood by query.analyze(), with corpus statistics when the index is ready."""
+    if question in _analyzed:
+        return _analyzed[question]
+    q = None
+    if _state["ready"]:
+        conn = _db()
+        try:
+            q = query.analyze(question, _Vocab(conn))
+        except sqlite3.Error:
+            q = None
+        finally:
+            conn.close()
+    if q is None:
+        return query.analyze(question)
+    if len(_analyzed) > 200:
+        _analyzed.clear()
+    _analyzed[question] = q
+    return q
 
 
 def relevant(question: str, slugs=None, max_fragments=10, per_source=3, size=520) -> list | None:
-    """Same result as search.relevant(), from the index. None if the index is not ready (the caller falls back)."""
+    """Same result as search.relevant(), from the index. None if the index is not ready (the caller falls back).
+    Retrieval in FTS5 (strict to loose), ranking in query.rank()."""
     if not _state["ready"]:
         return None
     if time.time() - _state["synced"] > 30:     # picks up transcripts added by hand; downloads sync on their own
         sync()
-    keys = search.keywords(question)
-    match = _query(keys)
-    if not match:
-        return []
-    stems = [re.compile(r"\b" + re.escape(search.plain(k)[:5])) for k in keys]
-    sql = ("SELECT text, title, mentor, name, sid, mark, url, bm25(paragraphs, 1.0, 2.0) AS rank FROM paragraphs "
-           "WHERE paragraphs MATCH ?")
-    params = [match]
-    if slugs:
-        sql += f" AND mentor IN ({','.join('?' * len(slugs))})"
-        params += list(slugs)
-    sql += " ORDER BY rank LIMIT 400"
     conn = _db()
     try:
-        rows = conn.execute(sql, params).fetchall()
+        vocab = _Vocab(conn)
+        q = analyzed(question)
+        if not q["slots"]:
+            return []
+        rows = {}
+        for match, limit, loose in query.fts_queries(q):
+            if loose and len(rows) >= 150:      # the strict queries already found plenty: skip the slow loose one
+                continue
+            sql = ("SELECT rowid, text, title, mentor, name, sid, mark, url FROM paragraphs WHERE paragraphs MATCH ?")
+            params = [match]
+            if slugs:
+                sql += f" AND mentor IN ({','.join('?' * len(slugs))})"
+                params += list(slugs)
+            sql += " ORDER BY bm25(paragraphs, 1.0, 2.0) LIMIT ?"
+            for r in conn.execute(sql, params + [limit]):
+                rows.setdefault(r[0], r)
+        candidates = [{"mentor": mentor, "name": name, "title": title, "id": sid, "minute": mark or None,
+                       "url": search.url_at(url, mark or None), "text": text}
+                      for _, text, title, mentor, name, sid, mark, url in rows.values()]
+        return query.rank(q, candidates, max_fragments, per_source, size, vocab)
     except sqlite3.Error:
         return None
     finally:
         conn.close()
-    candidates = []
-    for text, title, mentor, name, sid, mark, url, rank in rows:
-        norm = search.plain(text)
-        distinct = sum(1 for p in stems if p.search(norm))
-        # BM25 alone favors short paragraphs with one rare word; covering more of the question's words wins.
-        score = distinct * 3 - rank
-        if len(text) > size:
-            text = text[:size].rsplit(" ", 1)[0] + "..."
-        candidates.append({"score": score, "mentor": mentor, "name": name, "title": title, "id": sid,
-                           "minute": mark or None, "url": search.url_at(url, mark or None), "text": text})
-    candidates.sort(key=lambda c: -c["score"])
-    chosen, per_id = [], {}
-    for c in candidates:
-        key = (c["mentor"], c["title"])
-        if per_id.get(key, 0) >= per_source:
-            continue
-        per_id[key] = per_id.get(key, 0) + 1
-        chosen.append(c)
-        if len(chosen) >= max_fragments:
-            break
-    return chosen
