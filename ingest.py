@@ -479,7 +479,8 @@ def remove_source(slug: str, key: str) -> dict:
         raise ValueError(tr("That source is no longer there.", "Esa fuente ya no está."))
     conn = store.db()
     try:
-        busy = conn.execute("SELECT id FROM jobs WHERE slug=? AND status IN ('queued','running')", (slug,)).fetchone()
+        busy = conn.execute("SELECT id FROM jobs WHERE slug=? AND kind='download' AND status IN ('queued','running')",
+                            (slug,)).fetchone()                 # writing the profile does not touch the files
     finally:
         conn.close()
     if busy:

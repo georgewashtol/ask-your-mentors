@@ -545,7 +545,7 @@ class Units(unittest.TestCase):
             saved = {}
             conn = lambda: sqlite3.connect(":memory:", isolation_level=None)
             def fake_db():
-                c = conn(); c.execute("CREATE TABLE jobs(id, slug, status)"); return c
+                c = conn(); c.execute("CREATE TABLE jobs(id, slug, kind, status)"); return c
             with patch.object(ingest.store, "mentor", return_value={"slug": "m", "sources": [yt, pod]}), \
                     patch.object(ingest.store, "corpus", return_value=Path(tmp)), patch.object(ingest.store, "db", fake_db), \
                     patch.object(ingest.store, "save_mentor", side_effect=lambda m, new: saved.update(m)):
