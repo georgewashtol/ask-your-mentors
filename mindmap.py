@@ -44,7 +44,7 @@ def instruction(user: str) -> str:
 def _clean(node, depth: int, budget: list) -> dict | None:
     if not isinstance(node, dict) or budget[0] <= 0:
         return None
-    label = re.sub(r"\s+", " ", str(node.get("label") or "")).strip().replace("—", ",")[:MAX_LABEL]
+    label = re.sub(r"\s+", " ", str(node.get("label") or "")).strip().replace("\u2014", ",")[:MAX_LABEL]
     if not label:
         return None
     budget[0] -= 1
