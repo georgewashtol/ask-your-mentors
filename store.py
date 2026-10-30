@@ -285,7 +285,7 @@ def save_settings(changes: dict) -> None:
             b["enabled"] = changes["brain_enabled"]
         if "gemini_key" in changes:
             key = str(changes["gemini_key"] or "").strip()
-            if not re.fullmatch(r"[A-Za-z0-9_\-]{20,200}", key):
+            if not re.fullmatch(r"[A-Za-z0-9_.\-]{20,200}", key):     # AIza... (old) or AQ.... (since 2026)
                 raise ValueError(tr("That does not look like a Gemini key: copy it again from aistudio.google.com.",
                                     "Eso no parece una clave de Gemini: cópiala otra vez desde aistudio.google.com."))
             data.setdefault("ai", {}).update(gemini_key=key, provider="gemini")

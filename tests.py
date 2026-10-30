@@ -329,6 +329,8 @@ class Server(unittest.TestCase):
     def test_06e_gemini_key(self):
         with self.assertRaises(urllib.error.HTTPError):
             self.post("/api/settings", {"gemini_key": "not a key"})
+        s = self.post("/api/settings", {"gemini_key": "AQ.TEST_" + "x" * 30})              # the 2026 format has a dot
+        self.assertEqual(s["provider"], "gemini")
         s = self.post("/api/settings", {"gemini_key": "AIzaTEST_" + "x" * 30})
         self.assertEqual((s["provider"], s["ai_status"], s["has_gemini_key"]), ("gemini", "connected", True))
         self.assertNotIn("AIzaTEST", json.dumps(self.get("/api/status")))
