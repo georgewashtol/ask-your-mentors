@@ -239,6 +239,18 @@ class Server(unittest.TestCase):
         self.assertTrue((d / "text" / f"{m['sources'][0]['id']}.txt").exists())        # the other one stays
         with self.assertRaises(urllib.error.HTTPError):
             self.post("/api/mentors/source/remove", {"slug": "viktor-frankl", "key": sid})
+        # the picture: an icon, an uploaded photo (kept as a local thumbnail) or back to the channel photo
+        self.assertEqual(self.post("/api/mentors/avatar", {"slug": "viktor-frankl", "avatar": "emoji:🦉"})["mentor"]["avatar"], "emoji:🦉")
+        for bad in ("emoji:<b>", "https://evil.example/x.png", "/thumb/../x.jpg"):
+            with self.assertRaises(urllib.error.HTTPError):
+                self.post("/api/mentors/avatar", {"slug": "viktor-frankl", "avatar": bad})
+        png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+        a = self.post("/api/mentors/avatar", {"slug": "viktor-frankl", "image": "data:image/png;base64," + base64.b64encode(png).decode()})["mentor"]["avatar"]
+        self.assertRegex(a, r"^/thumb/[a-f0-9]{20}\.png$")
+        self.assertEqual(self.request(a)[2], png)
+        with self.assertRaises(urllib.error.HTTPError):
+            self.post("/api/mentors/avatar", {"slug": "viktor-frankl", "image": "data:image/png;base64," + base64.b64encode(b"<svg>").decode()})
+        self.assertEqual(self.post("/api/mentors/avatar", {"slug": "viktor-frankl", "avatar": ""})["mentor"]["avatar"], "")
         import advisor
         with patch.object(advisor.store, "list_mentors", return_value=[{"name": "Viktor Frankl", "slug": "viktor-frankl"}]):
             self.assertIn("ONLY: Viktor Frankl (viktor-frankl)", advisor.roster())

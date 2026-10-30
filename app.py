@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import mimetypes
 import re
@@ -476,6 +477,22 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 jid = None                                 # a download is already running: it picks up the new sources next time
             return self.send_json({"ok": True, "job": jid})
+        if path == "/api/mentors/avatar":
+            # {"avatar": ""|"initials"|"emoji:🦉"} or {"image": "data:image/...;base64,..."} uploaded from the computer
+            image = str(d.get("image") or "")
+            if image:
+                m = re.match(r"^data:image/[a-z+.-]+;base64,([A-Za-z0-9+/=]+)$", image)
+                data = base64.b64decode(m.group(1)) if m else b""
+                import thumbnails
+                ext = next((e for sig, e in thumbnails.SIGNATURES.items() if data.startswith(sig)), "")
+                if not ext or len(data) > 3 * 1024 * 1024:
+                    raise ValueError(tr("Upload a JPG, PNG, WEBP or GIF image under 3 MB.",
+                                        "Sube una imagen JPG, PNG, WEBP o GIF de menos de 3 MB."))
+                name = hashlib.sha1(data).hexdigest()[:20]
+                (store.DATA / "thumbs").mkdir(parents=True, exist_ok=True)
+                (store.DATA / "thumbs" / f"{name}.{ext}").write_bytes(data)
+                d["avatar"] = f"/thumb/{name}.{ext}"
+            return self.send_json({"ok": True, "mentor": store.set_avatar(str(d.get("slug") or ""), d.get("avatar"))})
         if path == "/api/mentors/file":
             name = str(d.get("name") or "")
             if not re.search(r"\.(pdf|txt|md|html?)$", name, re.I):
@@ -564,6 +581,7 @@ class Handler(BaseHTTPRequestHandler):
 
 class Server(ThreadingHTTPServer):
     daemon_threads = True
+    request_queue_size = 128    # the default 5 resets connections when a page loads many thumbnails at once
 
 
 def main(argv=None) -> None:

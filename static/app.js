@@ -239,9 +239,11 @@ $('#back-to-chat').addEventListener('click', () => showView('chat'));
 // ---------------------------------------------------------------- avatars
 const imageOf = r => ((r?.sources || []).find(f => /^\/thumb\//.test(f.image || '')) || {}).image || '';
 function avatar(r, cls = '') {
-  const img = imageOf(r);
-  if (img) return `<img class="avatar ${cls}" src="${esc(img)}" alt="">`;
+  const a = r?.avatar || '';
   const c = /^#[0-9a-f]{6}$/i.test(r?.color || '') ? r.color : '#8792a5';
+  if (a.startsWith('emoji:')) return `<span class="avatar emoji ${cls}" style="background:${c}22;border-color:${c}66"><i>${esc(a.slice(6))}</i></span>`;
+  const img = /^\/thumb\//.test(a) ? a : a === 'initials' ? '' : imageOf(r);
+  if (img) return `<img class="avatar ${cls}" src="${esc(img)}" alt="">`;
   const ini = r ? (r.initials || r.name.slice(0, 2)) : '?';
   return `<span class="avatar ${cls}" style="background:${c}22;color:${c};border-color:${c}66">${esc(ini)}</span>`;
 }
@@ -900,7 +902,7 @@ function paintMentors() {
     }).join('');
     const profile = (r.profile || '').trim();
     return `<article class="mentor-row" data-slug="${esc(r.slug)}" data-sig="${esc(rowSignature(r))}">
-      ${avatar(r, 'large')}
+      <button type="button" class="avatar-edit" data-act="avatar" title="${L('Change the picture', 'Cambiar la imagen')}" aria-label="${L(`Change ${esc(r.name)}'s picture`, `Cambiar la imagen de ${esc(r.name)}`)}">${avatar(r, 'large')}<span class="pencil" aria-hidden="true">✎</span></button>
       <div class="info">
         <h3>${esc(r.name)}</h3>
         <div class="stats-line">${statsText(r)}</div>
@@ -1037,6 +1039,50 @@ function uploadDocument(slug) {
   });
   input.click();
 }
+// ---------------------------------------------------------------- a mentor's picture: an icon, a photo or initials
+const AVATAR_ICONS = ['🦁', '🐺', '🦅', '🦉', '🐻', '🐯', '🦊', '🐢', '🐬', '🦋', '🐝', '🐘', '🦒', '🐼', '🐙', '🦈', '🐎', '🦄', '🐧', '🐸',
+  '🌵', '🌻', '🍀', '🌲', '🏔️', '🌊', '🔥', '⚡', '🌙', '⭐', '🪐', '🌈', '📚', '✏️', '🧠', '💡', '🎸', '🎹', '🎧', '📷',
+  '♟️', '🎯', '🏆', '💎', '⚓', '🧭', '🎨', '🚀', '⛵', '🏍️', '⚽', '🏀', '🎲', '🗿', '🛡️', '⚔️', '🔑', '⏳', '🧘', '🥋'];
+let AVATAR_FOR = null;
+function openAvatar(r) {
+  AVATAR_FOR = r.slug;
+  $('#avatar-title').textContent = L(`${r.name}'s picture`, `Imagen de ${r.name}`);
+  $('#avatar-auto').hidden = !imageOf(r);
+  $('#avatar-error').textContent = '';
+  $('#avatar-grid').innerHTML = AVATAR_ICONS.map(e => `<button type="button" class="avatar-pick ${r.avatar === 'emoji:' + e ? 'on' : ''}" data-v="emoji:${e}" aria-label="${e}">${e}</button>`).join('');
+  $('#dlg-avatar').showModal();
+}
+async function setAvatar(body) {
+  try {
+    await api('/api/mentors/avatar', { slug: AVATAR_FOR, ...body });
+    $('#dlg-avatar').close(); await loadMentors(); paintMentors(); paintChips();
+  } catch (e) { $('#avatar-error').textContent = e.message; }
+}
+// A photo is cut to a 256 px square here, so the server only keeps a small file
+function squareImage(file) {
+  return new Promise((ok, fail) => {
+    const img = new Image(), reader = new FileReader();      // read as data: (the CSP allows it, not blob:)
+    const bad = () => fail(new Error(L('That file is not an image.', 'Ese archivo no es una imagen.')));
+    img.onload = () => {
+      const side = Math.min(img.width, img.height), cv = document.createElement('canvas');
+      cv.width = cv.height = 256;
+      cv.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256);
+      ok(cv.toDataURL('image/jpeg', 0.88));
+    };
+    img.onerror = reader.onerror = bad;
+    reader.onload = () => { img.src = reader.result; };
+    reader.readAsDataURL(file);
+  });
+}
+$('#avatar-grid').addEventListener('click', ev => { const b = ev.target.closest('[data-v]'); if (b) setAvatar({ avatar: b.dataset.v }); });
+$('#avatar-auto').addEventListener('click', () => setAvatar({ avatar: '' }));
+$('#avatar-initials').addEventListener('click', () => setAvatar({ avatar: 'initials' }));
+$('#avatar-upload').addEventListener('click', () => $('#avatar-file').click());
+$('#avatar-file').addEventListener('change', async ev => {
+  const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
+  try { await setAvatar({ image: await squareImage(f) }); } catch (e) { $('#avatar-error').textContent = e.message; }
+});
+$('#close-avatar').addEventListener('click', () => $('#dlg-avatar').close());
 async function mentorAction(act, slug, id) {
   const r = MENTORS.find(x => x.slug === slug);
   try {
@@ -1051,6 +1097,7 @@ async function mentorAction(act, slug, id) {
     }
     if (act === 'upload') return uploadDocument(slug);
     if (act === 'doc') return openDocument(r, id);
+    if (act === 'avatar') return openAvatar(r);
     if (act === 'remove-source') {
       const f = r.sources.find(x => (x.type === 'file' ? x.id : x.url) === id); if (!f) return;
       const what = f.type === 'file' || f.type === 'web' ? L('its text', 'su texto') : L('the videos or episodes it brought', 'los videos o episodios que trajo');

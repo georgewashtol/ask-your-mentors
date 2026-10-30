@@ -496,3 +496,18 @@ svg.mode-icon { width: 15px; height: 15px; vertical-align: -3px; }
 .secret-field .eye .eye-off { display: none; }
 .secret-field .eye[aria-pressed="true"] .eye-off { display: inline; }
 .secret-field .eye[aria-pressed="true"] .eye-open { display: none; }
+
+/* a mentor's picture: an icon scales with the size of each avatar */
+.avatar.emoji { container-type: size; color: inherit; }
+.avatar.emoji i { font-style: normal; font-size: 62cqh; line-height: 1; }
+.avatar-edit { position: relative; padding: 0; border: 0; background: transparent; cursor: pointer; align-self: flex-start; border-radius: 12px; }
+.avatar-edit .pencil { position: absolute; right: -4px; bottom: -4px; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; line-height: 18px;
+  background: var(--panel); border: 1px solid var(--border2); color: var(--muted); opacity: 0; transition: opacity .15s; }
+.avatar-edit:hover .pencil, .avatar-edit:focus-visible .pencil { opacity: 1; }
+@media (hover: none) { .avatar-edit .pencil { opacity: 1; } }
+.avatar-dialog { width: min(520px, 94vw); }
+.avatar-own { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 6px; }
+.avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
+.avatar-pick { aspect-ratio: 1; font-size: 24px; padding: 0; border-radius: 10px; border: 1px solid var(--border2); background: var(--panel); cursor: pointer; }
+.avatar-pick:hover { border-color: var(--gold); }
+.avatar-pick.on { border-color: var(--gold); background: var(--accent-soft); }

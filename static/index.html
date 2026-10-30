@@ -96,6 +96,22 @@
   </div>
 </dialog>
 
+<!-- ============ Dialog: a mentor's picture ============ -->
+<dialog id="dlg-avatar" class="dialog avatar-dialog">
+  <div class="dlg-body">
+    <div class="dlg-head"><h2 id="avatar-title">Picture</h2><button type="button" id="close-avatar" class="icon-btn" aria-label="Close" data-es-aria="Cerrar">✕</button></div>
+    <div class="avatar-own">
+      <button type="button" class="small" id="avatar-upload" data-es="📷 Subir una foto">📷 Upload a photo</button>
+      <button type="button" class="small" id="avatar-auto" data-es="Foto de su canal">Their channel's photo</button>
+      <button type="button" class="small" id="avatar-initials" data-es="Iniciales">Initials</button>
+      <input type="file" id="avatar-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+    </div>
+    <p class="muted small" data-es="O elige un icono:">Or pick an icon:</p>
+    <div id="avatar-grid" class="avatar-grid"></div>
+    <p id="avatar-error" class="error"></p>
+  </div>
+</dialog>
+
 <!-- ============ Dialog: preview of an uploaded document ============ -->
 <dialog id="dlg-doc" class="dialog wide doc-dialog">
   <div class="dlg-body">

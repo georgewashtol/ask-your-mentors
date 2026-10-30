@@ -31,7 +31,7 @@ PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS mentors(
   slug TEXT PRIMARY KEY, name TEXT NOT NULL, language TEXT DEFAULT 'en', color TEXT DEFAULT '#d4a94a',
   initials TEXT DEFAULT '', when_to_ask TEXT DEFAULT '', profile TEXT DEFAULT '', sources TEXT DEFAULT '[]',
-  sort_order INTEGER DEFAULT 0, created TEXT, updated TEXT);
+  sort_order INTEGER DEFAULT 0, created TEXT, updated TEXT, avatar TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS chats(
   id INTEGER PRIMARY KEY, title TEXT NOT NULL, mode TEXT NOT NULL, ai_session TEXT DEFAULT '',
   provider TEXT DEFAULT '', pinned INTEGER DEFAULT 0, is_read INTEGER DEFAULT 1,
@@ -80,6 +80,8 @@ def start(data_folder: str | None = None) -> None:
     conn.executescript(SCHEMA)
     if "eta" not in {r[1] for r in conn.execute("PRAGMA table_info(jobs)")}:      # databases from before the time left
         conn.execute("ALTER TABLE jobs ADD COLUMN eta INTEGER DEFAULT 0")
+    if "avatar" not in {r[1] for r in conn.execute("PRAGMA table_info(mentors)")}:  # databases from before the avatar
+        conn.execute("ALTER TABLE mentors ADD COLUMN avatar TEXT DEFAULT ''")
     # If the server restarted with an answer or a job halfway, its thread died: mark it.
     conn.execute("UPDATE messages SET status='error', text=? WHERE status='pending'",
                  (tr("The server restarted before this answer was ready. Ask again.",
@@ -466,6 +468,24 @@ def save_mentor(data: dict, new: bool) -> dict:
         conn.close()
     text_dir(corpus() / slug).mkdir(parents=True, exist_ok=True)
     write_protocol()
+    return mentor(slug)
+
+
+RE_AVATAR = re.compile(r"^(|initials|emoji:[^\s<>\"'&]{1,16}|/thumb/[a-f0-9]{20}\.(jpg|png|webp|gif))$")
+
+
+def set_avatar(slug: str, avatar: str) -> dict:
+    """The mentor's picture: "" = their channel's photo (or initials), "initials", "emoji:🦉" or an uploaded /thumb/."""
+    avatar = str(avatar or "").strip()
+    if not RE_AVATAR.match(avatar):
+        raise ValueError(tr("Invalid picture.", "Imagen inválida."))
+    conn = db()
+    try:
+        if not conn.execute("UPDATE mentors SET avatar=?, updated=? WHERE slug=?", (avatar, now(), slug)).rowcount:
+            raise ValueError(tr("That mentor does not exist.", "Ese referente no existe."))
+        conn.commit()
+    finally:
+        conn.close()
     return mentor(slug)
 
 
