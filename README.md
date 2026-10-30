@@ -11,8 +11,28 @@ Open source · runs on your computer · AI optional · English and Spanish · <a
 
 - **Type a name, get a mentor.** The app finds their YouTube channel and podcast, you confirm, and it downloads the transcripts (text only, never video). Wrong person? Type another name and press Enter: the old search stops. An author you only have in books? Add them by hand with their name and one or several PDFs. Uploaded the wrong one? The × on each source takes it out along with its text. Click a mentor's picture to give them an icon or your own photo.
 - **Ask anything.** One mentor, several at once, or let the AI pick who has something real to say. Every idea links to the minute it was said.
+- **See it as a mind map.** The button under any answer turns it into a map: mentors, their ideas and the minute of each one. Works without AI too.
 - **Works without AI.** Base mode answers in under a second with their exact words. Turn the AI on for written answers that connect ideas (Claude Code, or Gemini for free).
 - **Yours.** Everything lives on your computer. Optional: connect your own notes (second brain) so the advice fits your life.
+
+## How it compares
+
+| | Ask Your Mentors | NotebookLM | Open Notebook |
+|---|:---:|:---:|:---:|
+| Add a mentor by typing their name | ✅ | ❌ | ❌ |
+| A whole YouTube channel in one go | ✅ | ❌ one video at a time | ❌ up to 50 links |
+| Podcasts by RSS, transcribed when needed | ✅ | ❌ upload the file | ❌ upload the file |
+| Link to the exact minute | ✅ | ❌ | ❌ |
+| Several mentors in one answer | ✅ | ❌ | ❌ |
+| Works without AI | ✅ | ❌ | ❌ |
+| Mind maps | ✅ | ✅ | ❌ |
+| Runs on your computer | ✅ | ❌ | ✅ |
+| Install | `python3 app.py` | nothing, it's a website | Docker, a database and API keys |
+| Spanish | ✅ | ✅ | ✅ |
+| Audio and video overviews, quizzes | ❌ | ✅ | audio only |
+| Mobile app and sharing | ❌ | ✅ | ❌ |
+
+Checked on October 29, 2026 against each product's own docs. If something changed, [open an issue](https://github.com/georgewashtol/ask-your-mentors/issues).
 
 ## Get it
 
@@ -121,9 +141,29 @@ YouTube's terms do not allow automated downloading, subtitles included, without 
 - **Instalarla con tu IA:** pega el prompt de [INSTALL_WITH_AI.md](INSTALL_WITH_AI.md) en Claude Code.
 - **Ponerla en español:** selector **EN | ES** abajo a la izquierda. La interfaz y las respuestas de la IA quedan en español.
 - **Gemini gratis:** saca tu clave en [aistudio.google.com/apikey](https://aistudio.google.com/apikey), enciende el switch de la **IA**, elige **Gemini · gratis** y pégala. En el plan gratis Google puede usar lo que envías para mejorar sus productos: no lo uses con información sensible.
+- **Mapa mental:** el botón debajo de cualquier respuesta la convierte en un mapa con los mentores, sus ideas y el minuto de cada una. También funciona sin IA.
 - **Segundo cerebro (opcional):** la IA puede LEER tu carpeta de notas para personalizar las respuestas; nunca la modifica. Si no tienes uno, la app te lo crea desde cero con 8 áreas de tu vida y los prompts para que tu IA te entreviste y lo llene.
 
 ![Con y sin IA](docs/comparison-es.svg)
+
+### Cómo se compara
+
+| | Ask Your Mentors | NotebookLM | Open Notebook |
+|---|:---:|:---:|:---:|
+| Agregar un mentor escribiendo su nombre | ✅ | ❌ | ❌ |
+| Un canal de YouTube completo de una vez | ✅ | ❌ video por video | ❌ hasta 50 enlaces |
+| Podcasts por RSS, transcritos si hace falta | ✅ | ❌ subes el archivo | ❌ subes el archivo |
+| Enlace al minuto exacto | ✅ | ❌ | ❌ |
+| Varios mentores en una respuesta | ✅ | ❌ | ❌ |
+| Funciona sin IA | ✅ | ❌ | ❌ |
+| Mapas mentales | ✅ | ✅ | ❌ |
+| Corre en tu computador | ✅ | ❌ | ✅ |
+| Instalación | `python3 app.py` | nada, es una web | Docker, una base de datos y claves de API |
+| Español | ✅ | ✅ | ✅ |
+| Resúmenes en audio y video, quices | ❌ | ✅ | solo audio |
+| App móvil y compartir | ❌ | ✅ | ❌ |
+
+Revisado el 29 de octubre de 2026 con la documentación de cada producto. Si algo cambió, [abre un issue](https://github.com/georgewashtol/ask-your-mentors/issues).
 
 ## License
 

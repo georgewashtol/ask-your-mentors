@@ -73,6 +73,12 @@ else:
     if "SECOND BRAIN" in text and "--add-dir" in args:
         print(json.dumps({"result": "BRAIN-ON LANG=en Test answer", "session_id": "s3"}))
         raise SystemExit
+    if "MIND MAP" in text:
+        tree = {"label": "Focus", "children": [{"label": "Cal Newport", "children": [
+            {"label": "Work in deep blocks", "cite": "Deep work, 01:05", "url": "https://www.youtube.com/watch?v=abcdefghijk&t=65s"},
+            {"label": "Bad link", "url": "javascript:alert(1)"}]}]}
+        print(json.dumps({"result": "Here it is: " + json.dumps(tree), "session_id": "s4"}))
+        raise SystemExit
     lang = "LANG=es" if "ENTIRE answer in Spanish" in text else "LANG=en" if "ENTIRE answer in English" in text else "LANG=?"
     print(json.dumps({"result": lang + " Test answer [Deep work, 01:05](https://www.youtube.com/watch?v=abcdefghijk&t=65s)", "session_id": "s2"}))
 """
@@ -349,6 +355,31 @@ class Server(unittest.TestCase):
             self.assertIn("### Cal Newport", a["text"])
             self.assertIn("&t=65s", a["text"])
             self.assertIn("abcdefghijk", a["text"])
+        finally:
+            cfg["ai"]["provider"] = "claude"
+            (self.data / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+
+    def test_07b_mind_map_with_and_without_ai(self):
+        self.put_text("cal-newport")
+        r = self.post("/api/ask", {"question": "How do I focus?", "mode": "cal-newport", "kind": "map"})
+        a = self.wait(f"/api/answer?id={r['message_id']}")
+        self.assertEqual(a["status"], "done", a)
+        self.assertTrue(a["text"].startswith("```mindmap"), a["text"])
+        tree = json.loads(a["text"].split("\n", 1)[1].rsplit("```", 1)[0])
+        leaves = tree["children"][0]["children"]
+        self.assertEqual(leaves[0]["url"], "https://www.youtube.com/watch?v=abcdefghijk&t=65s")
+        self.assertNotIn("url", leaves[1])                                   # javascript: links are dropped
+        chat = self.get(f"/api/chat?id={r['chat_id']}")
+        self.assertEqual(chat["messages"][0]["text"], "Mind map: How do I focus?")
+        cfg = json.loads((self.data / "config.json").read_text(encoding="utf-8"))
+        cfg["ai"]["provider"] = "none"
+        (self.data / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+        try:
+            r = self.post("/api/ask", {"question": "deep work distractions", "mode": "auto", "kind": "map"})
+            a = self.wait(f"/api/answer?id={r['message_id']}")
+            self.assertTrue(a["text"].startswith("```mindmap"), a["text"])
+            self.assertIn("Cal Newport", a["text"])
+            self.assertIn("&t=65s", a["text"])
         finally:
             cfg["ai"]["provider"] = "claude"
             (self.data / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
@@ -687,6 +718,17 @@ class Units(unittest.TestCase):
             code = doctor.run()
         self.assertIn(code, (0, 1))
         self.assertIn("Python", out.getvalue())
+
+    def test_mind_map_parse(self):
+        import mindmap
+        self.assertIsNone(mindmap.parse("no json here"))
+        self.assertIsNone(mindmap.parse({"label": "only a center"}))
+        deep = {"label": "q", "children": [{"label": f"n{i}", "children": [{"label": "a", "children": [{"label": "b", "children": [
+            {"label": "too deep"}]}]}]} for i in range(20)]}
+        tree = mindmap.parse(deep)
+        self.assertEqual(len(tree["children"]), mindmap.MAX_CHILDREN)
+        self.assertNotIn("too deep", json.dumps(tree))
+        self.assertNotIn("\u2014", json.dumps(mindmap.parse({"label": "a \u2014 b", "children": [{"label": "x"}]})))
 
     def test_keywords(self):
         self.assertEqual(search.keywords("¿Qué diría sobre el miedo a cobrar?"), ["miedo", "cobrar"])

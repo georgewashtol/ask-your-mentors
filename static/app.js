@@ -543,20 +543,70 @@ function readableDuration(sec) {
   return m ? (s ? `${plural(m, 'minute', 'minuto')} ${plural(s, 'second', 'segundo')}` : plural(m, 'minute', 'minuto')) : plural(s, 'second', 'segundo');
 }
 
+// ---------------------------------------------------------------- mind map
+// A map is saved as JSON inside a ```mindmap fence: {label, children: [{label, cite?, url?, children?}]}.
+const MAP_PREFIX = /^(Mind map|Mapa mental): /;
+function mapData(text) {
+  const t = String(text || '').trim();
+  if (!t.startsWith('```mindmap')) return null;
+  try { return JSON.parse(t.replace(/^```mindmap\s*/, '').replace(/```\s*$/, '')); } catch (e) { return null; }
+}
+function mapNode(n, depth, i) {
+  const url = n.url ? SafeMarkdown.safeUrl(n.url) : '';
+  const cite = n.cite ? (url ? `<a class="mm-cite" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(n.cite)}</a>` : `<span class="mm-cite">${esc(n.cite)}</span>`) : '';
+  const kids = (n.children || []).map((c, j) => mapNode(c, depth + 1, depth ? i : j)).join('');
+  const hue = depth === 1 ? ` style="--c: var(--mm${i % 6})"` : '';
+  return `<li class="d${depth}"${hue}><div class="mm-node${kids ? ' has-kids' : ''}" ${kids ? 'role="button" tabindex="0"' : ''}><span>${esc(n.label)}</span>${cite}</div>${kids ? `<ul>${kids}</ul>` : ''}</li>`;
+}
+function mapHTML(tree) {
+  return `<div class="mm-tools"><button type="button" class="small mm-copy">${L('Copy as outline', 'Copiar como esquema')}</button></div>
+    <div class="mm"><ul class="mm-tree"><li class="d0"><div class="mm-node root"><span>${esc(tree.label)}</span></div>${(tree.children || []).length ? `<ul>${tree.children.map((c, j) => mapNode(c, 1, j)).join('')}</ul>` : ''}</li></ul></div>`;
+}
+function mapOutline(n, depth = 0) {
+  const line = `${'  '.repeat(depth)}- ${n.label}${n.cite ? ` (${n.url ? `[${n.cite}](${n.url})` : n.cite})` : ''}`;
+  return [line, ...(n.children || []).map(c => mapOutline(c, depth + 1))].join('\n');
+}
+function bindMaps(messages) {
+  $$('#thread .mm-node.has-kids').forEach(n => {
+    const toggle = () => n.parentElement.classList.toggle('closed');
+    n.addEventListener('click', e => { if (!e.target.closest('a')) toggle(); });
+    n.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  });
+  $$('#thread .mm-copy').forEach(b => b.addEventListener('click', async () => {
+    const tree = mapData((messages.find(m => m.id === +b.closest('.msg').dataset.id) || {}).text);
+    const label = b.textContent;
+    try { await navigator.clipboard.writeText(mapOutline(tree)); b.textContent = L('Copied ✓', 'Copiado ✓'); }
+    catch (e) { b.textContent = L('Could not copy', 'No se pudo copiar'); }
+    setTimeout(() => { b.textContent = label; }, 1800);
+  }));
+  $$('#thread .mm-make').forEach(b => b.addEventListener('click', () => {
+    if (PENDING && CHAT) { (QUEUE[CHAT] = QUEUE[CHAT] || []).push({ question: b.dataset.q, mode: b.dataset.mode, kind: 'map' }); return openChat(CHAT); }
+    send(b.dataset.q, b.dataset.mode, 'map');
+  }));
+}
+
 function paintMessages(messages) {
   const thread = $('#thread');
   if (!messages.length) { paintEmpty(); return; }
+  let asked = '';
   thread.innerHTML = messages.map(m => {
-    if (m.role === 'user') return `<div class="msg user"><div class="meta">${L('You', 'Tú')} · ${esc(modeName(m.mode))}</div>${esc(m.text)}</div>`;
+    if (m.role === 'user') { asked = m.text; return `<div class="msg user"><div class="meta">${L('You', 'Tú')} · ${esc(modeName(m.mode))}</div>${esc(m.text)}</div>`; }
+    const isMap = MAP_PREFIX.test(asked);
     if (m.status === 'pending') {
       const many = MODES[m.mode] || slugsOf(m.mode), who = MODES[m.mode] ? L('your mentors', 'tus referentes') : esc(modeName(m.mode));
-      return `<div class="msg ai"><div class="waiting"><span class="dot"></span>${L(`Reading what ${who} said about it…`, `Leyendo lo que ${many ? 'dijeron' : 'dijo'} ${who} sobre esto…`)}</div></div>`;
+      const doing = isMap ? L('Drawing the mind map…', 'Dibujando el mapa mental…') : L(`Reading what ${who} said about it…`, `Leyendo lo que ${many ? 'dijeron' : 'dijo'} ${who} sobre esto…`);
+      return `<div class="msg ai"><div class="waiting"><span class="dot"></span>${doing}</div></div>`;
     }
     if (m.status === 'stopped') return `<div class="msg ai stopped"><div class="meta"><b>${esc(modeName(m.mode))}</b></div>⏹ ${L('You stopped this answer.', 'Detuviste esta respuesta.')}</div>`;
-    return `<div class="msg ai ${m.status === 'error' ? 'error' : ''}"><div class="meta"><b>${esc(modeName(m.mode))}</b><span>${readableDuration(m.seconds)}</span></div><div class="md">${m.status === 'error' ? esc(m.text) : md(m.text)}</div></div>`;
+    const tree = m.status === 'done' ? mapData(m.text) : null;
+    const make = m.status === 'done' && !tree && !isMap && asked
+      ? `<div class="msg-actions"><button type="button" class="small mm-make" data-q="${esc(asked)}" data-mode="${esc(m.mode)}">${L('Mind map', 'Mapa mental')}</button></div>` : '';
+    const body = m.status === 'error' ? esc(m.text) : tree ? mapHTML(tree) : md(m.text);
+    return `<div class="msg ai ${m.status === 'error' ? 'error' : ''}${tree ? ' map' : ''}" data-id="${m.id}"><div class="meta"><b>${esc(modeName(m.mode))}</b><span>${readableDuration(m.seconds)}</span></div><div class="md">${body}</div>${make}</div>`;
   }).join('') + (QUEUE[CHAT] || []).map((q, i) => `<div class="msg user queued"><div class="meta">${L('Queued · sent when the previous answer finishes', 'En cola · se envía cuando termine la respuesta anterior')}
       <button type="button" class="unqueue" data-i="${i}" title="${L('Remove from the queue', 'Quitar de la cola')}">✕</button></div>${esc(q.question)}</div>`).join('');
   $$('#thread .unqueue').forEach(b => b.addEventListener('click', () => { QUEUE[CHAT].splice(+b.dataset.i, 1); openChat(CHAT); }));
+  bindMaps(messages);
   PENDING = (messages.find(m => m.status === 'pending') || {}).id || 0;
   composerState();
   thread.scrollTop = thread.scrollHeight;
@@ -586,16 +636,16 @@ function poll(mid) {
       if (r.status !== 'pending') {
         clearInterval(POLL);
         const next = (QUEUE[CHAT] || []).shift();
-        if (next) return send(next.question, next.mode);           // the next one in the queue goes out by itself
+        if (next) return send(next.question, next.mode, next.kind);           // the next one in the queue goes out by itself
         if (CHAT) openChat(CHAT);
       }
     } catch (e) { clearInterval(POLL); }
   }, 2000);
 }
-async function send(question, mode) {
+async function send(question, mode, kind) {
   $('#send').disabled = true;
   try {
-    const r = await api('/api/ask', { question, mode, chat_id: CHAT });
+    const r = await api('/api/ask', { question, mode, chat_id: CHAT, ...(kind === 'map' ? { kind } : {}) });
     CHAT = r.chat_id;
     await openChat(CHAT);
     poll(r.message_id);

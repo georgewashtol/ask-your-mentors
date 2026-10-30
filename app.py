@@ -403,6 +403,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/ask":
             question = str(d.get("question") or "").strip()
             mode = advisor.valid_mode(str(d.get("mode") or "auto"))
+            kind = "map" if d.get("kind") == "map" else "answer"
             if not question or len(question) > 6000:
                 raise ValueError(tr("The question is empty or too long.", "La pregunta está vacía o es muy larga."))
             conn = store.db()
@@ -417,15 +418,16 @@ class Handler(BaseHTTPRequestHandler):
                     title = re.sub(r"\s+", " ", question)[:70]
                     cid = conn.execute("INSERT INTO chats(title,mode,created,updated) VALUES(?,?,?,?)",
                                        (title, mode, store.now(), store.now())).lastrowid
+                shown = tr("Mind map: ", "Mapa mental: ") + question if kind == "map" else question
                 conn.execute("INSERT INTO messages(chat_id,role,mode,text,status,ts) VALUES(?,?,?,?,?,?)",
-                             (cid, "user", mode, question, "done", store.now()))
+                             (cid, "user", mode, shown, "done", store.now()))
                 mid = conn.execute("INSERT INTO messages(chat_id,role,mode,text,status,ts) VALUES(?,?,?,?,?,?)",
                                    (cid, "ai", mode, "", "pending", store.now())).lastrowid
                 conn.execute("UPDATE chats SET updated=?, mode=? WHERE id=?", (store.now(), mode, cid))
                 conn.commit()
             finally:
                 conn.close()
-            threading.Thread(target=advisor.answer_in_thread, args=(cid, mid, question, mode), daemon=True).start()
+            threading.Thread(target=advisor.answer_in_thread, args=(cid, mid, question, mode, kind), daemon=True).start()
             return self.send_json({"chat_id": cid, "message_id": mid})
         if path.startswith("/api/chat/"):
             return self.chat_action(path.rsplit("/", 1)[1], d)
