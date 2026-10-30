@@ -485,6 +485,11 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError(tr("Invalid file.", "Archivo inválido."))
             return self.send_json(ingest.upload_document(str(d.get("slug") or ""), name, base64.b64decode(m.group(1)),
                                                          profile=d.get("profile") is not False))
+        if path == "/api/mentors/source/remove":
+            r = ingest.remove_source(str(d.get("slug") or ""), str(d.get("key") or ""))
+            import fulltext
+            fulltext.sync_in_background()
+            return self.send_json(r)
         if path == "/api/mentors/delete":
             ingest.cancel_mentor(str(d.get("slug") or ""))     # a download in progress would recreate its folder
             store.delete_mentor(str(d.get("slug") or ""), files=bool(d.get("files")))

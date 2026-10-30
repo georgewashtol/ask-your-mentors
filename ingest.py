@@ -467,6 +467,78 @@ def upload_document(slug: str, name: str, data: bytes, profile: bool = True) -> 
     return {"ok": True, "note": note}
 
 
+def remove_source(slug: str, key: str) -> dict:
+    """Takes a source out of a mentor (key = a document's id or the source's link) and deletes the material it brought.
+    A document is exact. A YouTube channel or podcast is too when it is the only one of its kind; with several, the
+    material is kept because the videos do not say which channel they came from."""
+    m = store.mentor(slug)
+    if not m:
+        raise ValueError(tr("That mentor does not exist.", "Ese referente no existe."))
+    src = next((s for s in m["sources"] if key and key in (s.get("id"), s.get("url"))), None)
+    if not src:
+        raise ValueError(tr("That source is no longer there.", "Esa fuente ya no está."))
+    conn = store.db()
+    try:
+        busy = conn.execute("SELECT id FROM jobs WHERE slug=? AND status IN ('queued','running')", (slug,)).fetchone()
+    finally:
+        conn.close()
+    if busy:
+        raise ValueError(tr("Stop the download in progress first.", "Primero detén la descarga en curso."))
+    d = store.corpus() / slug
+    rest = [s for s in m["sources"] if s is not src]
+    kind = src["type"]
+    ids, kept = set(), False
+    if kind == "file":
+        ids = {src.get("id")}
+    elif kind == "web":
+        ids = {texts.document_id(src["url"])}
+    elif any(s["type"] == kind for s in rest):
+        kept = True
+    else:
+        found = set(search.read_index(d)) | {mm.group(1) for p in search.text_files(d)
+                                               for mm in [re.search(r"\[([A-Za-z0-9_-]+)\]\.txt$", p.name)] if mm}
+        rss = kind == "rss"
+        ids = {i for i in found if i.startswith("rss-") == rss and not i.startswith(("doc-", "web-"))}
+    ids.discard(None)
+    removed = _delete_items(d, ids) if ids else 0
+    store.save_mentor({**m, "sources": rest}, new=False)
+    if kept:
+        note = tr("Source removed. Its material stays: it shares it with the other {k} sources.",
+                  "Fuente quitada. Su material se queda: lo comparte con las otras fuentes de {k}.",
+                  k="YouTube" if kind == "youtube" else "podcast")
+    else:
+        note = tr("Source removed with its material ({n}).", "Fuente quitada con su material ({n}).", n=removed)
+    return {"ok": True, "note": note, "removed": removed, "kept": kept}
+
+
+def _delete_items(d: Path, ids: set) -> int:
+    """Deletes the text, subtitles, audio and index rows of these ids. Returns how many had text."""
+    removed = 0
+    folder = store.text_dir(d)                     # only the app's own folder: extra folders are the user's
+    for p in folder.glob("*.txt") if folder.is_dir() else []:
+        mm = re.search(r"\[([A-Za-z0-9_-]+)\]\.txt$", p.name)
+        if (mm and mm.group(1) in ids) or p.stem in ids:
+            p.unlink()
+            removed += 1
+    for folder in (store.raw_dir(d), d / "audio"):
+        if folder.is_dir():
+            for p in folder.iterdir():
+                mm = clean.RE_ID.search(p.name)
+                # subtitles "... [id].es.vtt", audio "rss-x.mp3", documents "doc-x.bin" or "doc-x-name.pdf"
+                if p.is_file() and ((mm and mm.group(1) in ids) or p.name.split(".")[0] in ids or p.name[:16] in ids):
+                    p.unlink()
+    index = search.read_index(d)
+    if any(i in index for i in ids):
+        for i in ids:
+            index.pop(i, None)
+        with open(store.index_file(d), "w", encoding="utf-8") as f:
+            for row in sorted(index.values(), key=lambda r: r[1], reverse=True):
+                f.write("\t".join(row) + "\n")
+        with open(store.archive_file(d), "w", encoding="utf-8") as f:   # so adding the channel again brings it all back
+            f.writelines(f"youtube {i}\n" for i in index if not i.startswith("rss-"))
+    return removed
+
+
 def normalize_youtube(url: str) -> str:
     """A channel without a tab is downloaded only from /videos (skips Shorts and live streams)."""
     u = urllib.parse.urlsplit(url.strip())

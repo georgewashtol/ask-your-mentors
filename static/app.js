@@ -892,9 +892,11 @@ function paintMentors() {
     const sources = r.sources.map(f => {
       const u = SafeMarkdown.safeUrl(f.page || f.url);
       const inner = `${sourceIcon(f)}<span>${esc(f.name || f.url)}</span>`;
-      return u ? `<a class="source-chip" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(platformName(platform(f)))}">${inner}</a>`
+      const chip = u ? `<a class="source-chip" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(platformName(platform(f)))}">${inner}</a>`
         : f.type === 'file' && f.id ? `<button type="button" class="source-chip doc" data-act="doc" data-id="${esc(f.id)}" title="${L('See the document', 'Ver el documento')}">${inner}</button>`
         : `<span class="source-chip" title="${L('Uploaded document', 'Documento subido')}">${inner}</span>`;
+      const key = f.type === 'file' ? f.id : f.url;
+      return key ? `<span class="source-item">${chip}<button type="button" class="source-x" data-act="remove-source" data-id="${esc(key)}" title="${L('Remove this source', 'Quitar esta fuente')}" aria-label="${L(`Remove ${esc(f.name || f.url)}`, `Quitar ${esc(f.name || f.url)}`)}">×</button></span>` : chip;
     }).join('');
     const profile = (r.profile || '').trim();
     return `<article class="mentor-row" data-slug="${esc(r.slug)}" data-sig="${esc(rowSignature(r))}">
@@ -1049,6 +1051,16 @@ async function mentorAction(act, slug, id) {
     }
     if (act === 'upload') return uploadDocument(slug);
     if (act === 'doc') return openDocument(r, id);
+    if (act === 'remove-source') {
+      const f = r.sources.find(x => (x.type === 'file' ? x.id : x.url) === id); if (!f) return;
+      const what = f.type === 'file' || f.type === 'web' ? L('its text', 'su texto') : L('the videos or episodes it brought', 'los videos o episodios que trajo');
+      if (!confirm(L(`Remove «${f.name || f.url}» from ${r.name}'s sources? The AI stops using it and ${what} is deleted. This cannot be undone.`,
+        `¿Quitar «${f.name || f.url}» de las fuentes de ${r.name}? La IA deja de usarla y se borra ${what}. No se puede deshacer.`))) return;
+      const res = await api('/api/mentors/source/remove', { slug, key: id });
+      await loadMentors(); paintMentors();
+      if (res.kept) alert(res.note);
+      return;
+    }
     if (act === 'all') { await api('/api/mentors/download', { slug, limit: 0 }); return refreshJobs(true); }
     if (act === 'cancel') { await api('/api/jobs/cancel', { id: +id }); return refreshJobs(true); }
     if (act === 'delete') {

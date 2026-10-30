@@ -227,6 +227,18 @@ class Server(unittest.TestCase):
             self.assertTrue(f["name"].endswith(".pdf") and len(f["name"]) == 120, f["name"])
             st, h, _ = self.request(f"/api/mentors/document?slug=viktor-frankl&id={f['id']}")
             self.assertEqual(h["Content-Type"], "application/pdf")
+        # a wrong document can be taken out: it leaves the sources and its text and file are deleted
+        d = self.data / "corpus" / "viktor-frankl"
+        self.assertTrue((d / "text" / f"{sid}.txt").exists())
+        r = self.post("/api/mentors/source/remove", {"slug": "viktor-frankl", "key": sid})
+        self.assertEqual((r["removed"], r["kept"]), (1, False))
+        m = next(x for x in self.get("/api/mentors")["mentors"] if x["slug"] == "viktor-frankl")
+        self.assertNotIn("one.txt", [s["name"] for s in m["sources"]])
+        self.assertFalse((d / "text" / f"{sid}.txt").exists())
+        self.assertFalse([p for p in (d / "raw").iterdir() if p.name.startswith(sid)])
+        self.assertTrue((d / "text" / f"{m['sources'][0]['id']}.txt").exists())        # the other one stays
+        with self.assertRaises(urllib.error.HTTPError):
+            self.post("/api/mentors/source/remove", {"slug": "viktor-frankl", "key": sid})
         import advisor
         with patch.object(advisor.store, "list_mentors", return_value=[{"name": "Viktor Frankl", "slug": "viktor-frankl"}]):
             self.assertIn("ONLY: Viktor Frankl (viktor-frankl)", advisor.roster())
@@ -501,6 +513,44 @@ class Resume(unittest.TestCase):
 
 
 class Units(unittest.TestCase):
+    def test_remove_a_channel_or_podcast(self):
+        """Taking out the only YouTube channel deletes its videos and nothing else; with two channels the material stays."""
+        import sqlite3
+        import ingest
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp) / "m"
+            for sub in ("text", "raw", "audio"):
+                (d / sub).mkdir(parents=True)
+            for i in ("abcdefghijk", "rss-1234567890"):
+                (d / "text" / f"20260101 - Title [{i}].txt").write_text("x")
+                (d / "raw" / f"20260101 - Title [{i}].es.vtt").write_text("x")
+            (d / "audio" / "rss-1234567890.mp3").write_text("x")
+            (d / "text" / "doc-aaaaaaaaaaaa.txt").write_text("x")
+            (d / "index.tsv").write_text("abcdefghijk\t20260101\t60\t\tVideo\thttps://youtu.be/abcdefghijk\n"
+                                        "rss-1234567890\t20260101\t60\t\tEpisode\thttps://pod.example/1\n")
+            (d / "archive.txt").write_text("youtube abcdefghijk\n")
+            yt, pod = {"type": "youtube", "url": "https://www.youtube.com/@a"}, {"type": "rss", "url": "https://pod.example/feed"}
+            saved = {}
+            conn = lambda: sqlite3.connect(":memory:", isolation_level=None)
+            def fake_db():
+                c = conn(); c.execute("CREATE TABLE jobs(id, slug, status)"); return c
+            with patch.object(ingest.store, "mentor", return_value={"slug": "m", "sources": [yt, pod]}), \
+                    patch.object(ingest.store, "corpus", return_value=Path(tmp)), patch.object(ingest.store, "db", fake_db), \
+                    patch.object(ingest.store, "save_mentor", side_effect=lambda m, new: saved.update(m)):
+                r = ingest.remove_source("m", yt["url"])
+            self.assertEqual((r["removed"], r["kept"], saved["sources"]), (1, False, [pod]))
+            self.assertEqual(sorted(p.name for p in (d / "text").iterdir()),
+                             ["20260101 - Title [rss-1234567890].txt", "doc-aaaaaaaaaaaa.txt"])
+            self.assertEqual(sorted(p.name for p in (d / "raw").iterdir()), ["20260101 - Title [rss-1234567890].es.vtt"])
+            self.assertEqual((d / "archive.txt").read_text(), "")              # adding the channel again brings it all back
+            self.assertTrue((d / "audio" / "rss-1234567890.mp3").exists())
+            other = {"type": "youtube", "url": "https://www.youtube.com/@b"}
+            with patch.object(ingest.store, "mentor", return_value={"slug": "m", "sources": [yt, other]}), \
+                    patch.object(ingest.store, "corpus", return_value=Path(tmp)), patch.object(ingest.store, "db", fake_db), \
+                    patch.object(ingest.store, "save_mentor", side_effect=lambda m, new: saved.update(m)):
+                r = ingest.remove_source("m", yt["url"])
+            self.assertEqual((r["removed"], r["kept"], saved["sources"]), (0, True, [other]))
+
     def test_same_episode_on_youtube_and_podcast(self):
         import ingest
         k = ingest._title_key
