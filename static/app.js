@@ -99,9 +99,16 @@ function paintBrain() {
   d.disabled = !ai;
   d.textContent = !ai ? L('Off · needs the AI on', 'Apagado · necesita la IA encendida')
     : !on ? L('Off · not connected', 'Apagado · sin conectar') : `${L('On', 'Encendido')} · ${short}`;
-  d.title = !ai ? sw.title : on ? L(`The AI reads only what it needs from ${b.path}, read-only. Click to change the folder.`, `La IA lee solo lo que necesita de ${b.path}, sin modificar nada. Haz clic para cambiar la carpeta.`)
+  if (on && ai && STATUS.provider === 'gemini') { d.className = 'link-btn warn'; d.textContent += ' · Gemini'; }
+  d.title = !ai ? sw.title : on && STATUS.provider === 'gemini' ? geminiBrainWarning() : on ? L(`The AI reads only what it needs from ${b.path}, read-only. Click to change the folder.`, `La IA lee solo lo que necesita de ${b.path}, sin modificar nada. Haz clic para cambiar la carpeta.`)
     : L('Turn it on to connect your notes, or create a second brain from scratch.', 'Enciéndelo para conectar tus notas o crear un segundo cerebro desde cero.');
 }
+// Gemini has no tools: the app itself sends it up to 4 notes per question (the first 700 characters of each).
+// On the free plan Google may use them to improve its products, so turning the brain on with Gemini asks first.
+const geminiBrainWarning = () => L('With Gemini, every question sends Google up to 4 of your notes (the first 700 characters of each). On the free plan Google may use them to improve its products and people may review them. Do not use it with sensitive notes (money, health, contracts), or turn on billing in Google AI Studio, or use Claude or a local model.',
+  'Con Gemini, en cada pregunta viajan a Google hasta 4 de tus notas (los primeros 700 caracteres de cada una). En el plan gratis Google puede usarlas para mejorar sus productos y personas pueden revisarlas. No lo uses con notas sensibles (dinero, salud, contratos), o activa la facturación en Google AI Studio, o usa Claude o un modelo local.');
+const confirmGeminiBrain = () => STATUS.provider !== 'gemini'
+  || confirm(geminiBrainWarning() + '\n\n' + L('Turn the second brain on anyway?', '¿Encender el segundo cerebro de todos modos?'));
 async function askBrainPath() {
   const current = (STATUS.brain || {}).path || '';
   const p = prompt(L('Where is your second brain? Paste the full path of the folder with your notes (Markdown or text).\nExample: ~/Documents/my-notes\n\nThe AI will only READ it, never modify it.',
@@ -110,6 +117,7 @@ async function askBrainPath() {
 }
 function openBrain() {
   $('#brain-status').textContent = ''; $('#brain-status').className = 'small';
+  $('#brain-gemini').hidden = STATUS.provider !== 'gemini'; $('#brain-gemini').textContent = geminiBrainWarning();
   $('#dlg-brain').showModal();
 }
 async function brainAction(path) {
@@ -141,11 +149,12 @@ $('#close-brain').addEventListener('click', () => $('#dlg-brain').close());
 $('#brain-switch').addEventListener('click', async () => {
   if (!aiOn()) return;
   const b = STATUS.brain || {}, on = !b.enabled;
+  if (on && !confirmGeminiBrain()) return;
   if (on && !b.path) return openBrain();                 // first time: choose or create the folder
   try { STATUS = { ...STATUS, ...(await api('/api/settings', { brain_enabled: on })) }; paintBrain(); }
   catch (e) { alert(e.message); }
 });
-$('#brain-detail').addEventListener('click', () => { if (aiOn()) openBrain(); });
+$('#brain-detail').addEventListener('click', () => { if (aiOn() && ((STATUS.brain || {}).enabled || confirmGeminiBrain())) openBrain(); });
 
 function connectButton(text = L('Connect Claude', 'Conectar Claude')) { return `<button type="button" class="small primary open-connect">${text}</button>`; }
 document.addEventListener('click', ev => { if (ev.target.closest('.open-connect')) openConnect(); });
@@ -197,6 +206,10 @@ $('#save-gemini').addEventListener('click', async () => {
     $('#gemini-key').value = ''; applyBrand(); if (!CHAT) paintEmpty();
     $('#gemini-status').textContent = L('✓ Gemini is on. You can close this window.', '✓ Gemini quedó encendida. Ya puedes cerrar esta ventana.');
     $('#gemini-status').className = 'ok small';
+    if ((STATUS.brain || {}).enabled) {                   // the brain was already on: say what now travels to Google
+      $('#gemini-status').textContent += ' ' + L('Your second brain is on.', 'Tu segundo cerebro está encendido.') + ' ' + geminiBrainWarning();
+      $('#gemini-status').className = 'notice warn small';
+    }
   } catch (e) { $('#gemini-status').textContent = e.message; $('#gemini-status').className = 'error small'; }
 });
 $('#close-connect').addEventListener('click', () => $('#dlg-connect').close());
